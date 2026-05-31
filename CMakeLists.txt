@@ -64,10 +64,20 @@ add_subdirectory(src/botlib)     # -> etrm_botlib (static, -DBOTLIB)
 add_subdirectory(src/splines)    # -> etrm_splines(static, C++)
 
 # ----------------------------------------------------------------------------
-#  Engine targets  — added in subsequent Phase 1 commits.
+#  Engine core (server + qcommon + shared game math)
+#
+#  Built as a static library so it can be compile-verified on its own before
+#  the platform/client/renderer layers exist. External symbols (Sys_*, CL_*,
+#  renderer) are intentionally unresolved here — they link into etrm/etrmded
+#  in a later commit. vm_x86.c is OMITTED on non-x86 (interpreter only, Phase 1).
+# ----------------------------------------------------------------------------
+include(EngineCore)
+
+# ----------------------------------------------------------------------------
+#  Remaining engine targets — added in subsequent Phase 1 commits.
 # ----------------------------------------------------------------------------
 # add_subdirectory(src/sys)      # SDL2 platform layer (todo)
-# the etrm / etrmded executables (todo)
+# renderer + client sources, then the etrm / etrmded executables (todo)
 
 message(STATUS "ET-RM configured: ${CMAKE_SYSTEM_NAME} / ${CMAKE_C_COMPILER_ID} / "
                "${CMAKE_SIZEOF_VOID_P}*8-bit / build=${CMAKE_BUILD_TYPE}")

@@ -539,6 +539,16 @@ vm_t *VM_Create( const char *module, int ( *systemCalls )(int *),
 	// copy or compile the instructions
 	vm->codeLength = header->codeLength;
 
+#if !id386
+	// No native code generator on this architecture (vm_x86.c is 32-bit x86
+	// only). Always run the portable bytecode interpreter. The x86_64/ARM
+	// JIT is restored in Phase 2; the interpreter remains the determinism
+	// reference for the feel harness.
+	if ( interpret >= VMI_COMPILED ) {
+		interpret = VMI_BYTECODE;
+	}
+#endif
+
 	if ( interpret >= VMI_COMPILED ) {
 		vm->compiled = qtrue;
 		VM_Compile( vm, header );
@@ -834,10 +844,15 @@ void VM_LogSyscalls( int *args ) {
 #define DLL_ONLY    //DAJ
 #endif
 
-#ifdef DLL_ONLY // bk010215 - for DLL_ONLY dedicated servers/builds w/o VM
+// Provide stubs when there is no native code generator linked in:
+//  - DLL_ONLY builds (no VM compiler at all), or
+//  - non-x86 architectures (vm_x86.c is 32-bit x86 only and is not compiled).
+// On those targets VM_Create() above forces VMI_BYTECODE, so these stubs are
+// never actually invoked; they exist purely to satisfy the linker.
+#if defined( DLL_ONLY ) || !id386 // bk010215 - for DLL_ONLY dedicated servers/builds w/o VM
 int VM_CallCompiled( vm_t *vm, int *args ) {
 	return( 0 );
 }
 
 void VM_Compile( vm_t *vm, vmHeader_t *header ) {}
-#endif // DLL_ONLY
+#endif // DLL_ONLY || !id386
