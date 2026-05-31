@@ -51,6 +51,7 @@ option(USE_INTERNAL_JPEG     "Use the bundled libjpeg-6b"   ON)
 option(USE_INTERNAL_FREETYPE "Use the bundled FreeType 2"   ON)
 option(BUILD_CLIENT          "Build the client (etrm)"      ON)
 option(BUILD_SERVER          "Build the dedicated server (etrmded)" ON)
+option(BUILD_FEEL_HARNESS    "Build the pmove determinism test (Phase 3)" ON)
 
 include(CompilerWarnings)
 
@@ -92,6 +93,7 @@ include(Dedicated)          # etrmded (Windows-first, no SDL)
 include(Client)             # etrm (native Win32 client; SDL2 swap follows)
 include(GameModule)         # qagame_mp_x86_64.dll (native 64-bit server game module)
 include(ClientModules)      # cgame_mp_x86_64.dll + ui_mp_x86_64.dll
+include(FeelHarness)        # etrm_feeltest — pmove determinism (Phase 3)
 
 # ----------------------------------------------------------------------------
 #  Remaining engine targets — added in subsequent Phase 1 commits.
