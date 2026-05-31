@@ -388,7 +388,7 @@ typedef enum {
 } sharedTraps_t;
 
 void    VM_Init( void );
-vm_t    *VM_Create( const char *module, int ( *systemCalls )( int * ),
+vm_t    *VM_Create( const char *module, intptr_t ( *systemCalls )( intptr_t * ),
 					vmInterpret_t interpret );
 // module should be bare: "cgame", not "cgame.dll" or "vm/cgame.qvm"
 
@@ -396,12 +396,16 @@ void    VM_Free( vm_t *vm );
 void    VM_Clear( void );
 vm_t    *VM_Restart( vm_t *vm );
 
-int QDECL VM_Call( vm_t *vm, int callNum, ... );
+intptr_t QDECL VM_Call( vm_t *vm, int callNum, ... );
 
 void    VM_Debug( int level );
 
-void    *VM_ArgPtr( int intValue );
-void    *VM_ExplicitArgPtr( vm_t *vm, int intValue );
+void    *VM_ArgPtr( intptr_t intValue );
+void    *VM_ExplicitArgPtr( vm_t *vm, intptr_t intValue );
+
+// 64-bit syscall ABI helper: a float argument is passed as its 32-bit IEEE
+// bit pattern in the low half of an intptr_t arg slot. VMF() reads it back.
+typedef union { float f; int i; unsigned int ui; } floatint_t;
 
 /*
 ==============================================================
@@ -840,6 +844,7 @@ void        Com_EndRedirect( void );
 int QDECL Com_VPrintf( const char *fmt, va_list argptr ) _attribute( ( format( printf,1,0 ) ) ); // conforms to vprintf prototype for print callback passing
 void QDECL Com_Printf( const char *fmt, ... ) _attribute( ( format( printf,1,2 ) ) ); // this one calls to Com_VPrintf now
 void QDECL Com_DPrintf( const char *fmt, ... ) _attribute( ( format( printf,1,2 ) ) );
+void Com_RMTrace( const char *fmt, ... );   // RM: crash-proof early trace log (debug)
 void QDECL Com_Error( int code, const char *fmt, ... ) _attribute( ( format( printf,2,3 ) ) );
 void        Com_Quit_f( void );
 int         Com_EventLoop( void );
@@ -1109,8 +1114,8 @@ void Sys_LeaveCriticalSection( void *ptr );
 
 char* Sys_GetDLLName( const char *name );
 // fqpath param added 2/15/02 by T.Ray - Sys_LoadDll is only called in vm.c at this time
-void    * QDECL Sys_LoadDll( const char *name, char *fqpath, int( QDECL * *entryPoint ) ( int, ... ),
-							 int ( QDECL * systemcalls )( int, ... ) );
+void    * QDECL Sys_LoadDll( const char *name, char *fqpath, intptr_t( QDECL * *entryPoint ) ( int, ... ),
+							 intptr_t ( QDECL * systemcalls )( intptr_t, ... ) );
 void    Sys_UnloadDll( void *dllHandle );
 
 void    Sys_UnloadGame( void );

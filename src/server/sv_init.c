@@ -493,6 +493,7 @@ void SV_SpawnServer( char *server, qboolean killBots ) {
 	qboolean isBot;
 	const char  *p;
 
+	Com_RMTrace( "SV_SpawnServer ENTER: %s", server );
 
 	// ydnar: broadcast a level change to all connected clients
 	if ( svs.clients && !com_errorEntered ) {
@@ -501,6 +502,7 @@ void SV_SpawnServer( char *server, qboolean killBots ) {
 
 	// shut down the existing game if it is running
 	SV_ShutdownGameProgs();
+	Com_RMTrace( "SV_SpawnServer: after ShutdownGameProgs" );
 
 	Com_Printf( "------ Server Initialization ------\n" );
 	Com_Printf( "Server: %s\n",server );
@@ -525,11 +527,13 @@ void SV_SpawnServer( char *server, qboolean killBots ) {
 	// except for file system data and cached renderer data
 	Z_LogHeap();
 
+	Com_RMTrace( "SV_SpawnServer: after ClearServer/Hunk_Clear; configstrings..." );
 	// allocate empty config strings
 	for ( i = 0 ; i < MAX_CONFIGSTRINGS ; i++ ) {
 		sv.configstrings[i] = CopyString( "" );
 		sv.configstringsmodified[i] = qfalse;
 	}
+	Com_RMTrace( "SV_SpawnServer: configstrings done; SV_Startup/maxclients..." );
 
 	// init client structures and svs.numSnapshotEntities
 	if ( !Cvar_VariableValue( "sv_running" ) ) {
@@ -544,9 +548,11 @@ void SV_SpawnServer( char *server, qboolean killBots ) {
 	// clear pak references
 	FS_ClearPakReferences( 0 );
 
+	Com_RMTrace( "SV_SpawnServer: SV_Startup done; snapshotEntities Hunk_Alloc..." );
 	// allocate the snapshot entities on the hunk
 	svs.snapshotEntities = Hunk_Alloc( sizeof( entityState_t ) * svs.numSnapshotEntities, h_high );
 	svs.nextSnapshotEntities = 0;
+	Com_RMTrace( "SV_SpawnServer: snapshotEntities alloc OK (%i ents); cvars+SetExpectedHunkUsage...", svs.numSnapshotEntities );
 
 	// toggle the server bit so clients can detect that a
 	// server has changed
@@ -586,9 +592,12 @@ void SV_SpawnServer( char *server, qboolean killBots ) {
 	srand( Sys_Milliseconds() );
 	sv.checksumFeed = FS_RandChecksumFeed();
 #endif
+	Com_RMTrace( "SV_SpawnServer: SetExpectedHunkUsage done; FS_Restart..." );
 	FS_Restart( sv.checksumFeed );
 
+	Com_RMTrace( "SV_SpawnServer: CM_LoadMap %s...", server );
 	CM_LoadMap( va( "maps/%s.bsp", server ), qfalse, &checksum );
+	Com_RMTrace( "SV_SpawnServer: CM_LoadMap done (checksum %i)", checksum );
 
 	// set serverinfo visible name
 	Cvar_Set( "mapname", server );
@@ -612,7 +621,9 @@ void SV_SpawnServer( char *server, qboolean killBots ) {
 	Cvar_Set( "sv_serverRestarting", "1" );
 
 	// load and spawn all other entities
+	Com_RMTrace( "SV_SpawnServer: SV_InitGameProgs (load qagame + GAME_INIT)..." );
 	SV_InitGameProgs();
+	Com_RMTrace( "SV_SpawnServer: SV_InitGameProgs done; running %i init frames...", GAME_INIT_FRAMES );
 
 	// don't allow a map_restart if game is modified
 	// Arnout: there isn't any check done against this, obsolete
@@ -624,9 +635,11 @@ void SV_SpawnServer( char *server, qboolean killBots ) {
 		SV_BotFrame( svs.time );
 		svs.time += FRAMETIME;
 	}
+	Com_RMTrace( "SV_SpawnServer: init frames done; SV_CreateBaseline..." );
 
 	// create a baseline for more efficient communications
 	SV_CreateBaseline();
+	Com_RMTrace( "SV_SpawnServer: COMPLETE (server up)" );
 
 	for ( i = 0 ; i < sv_maxclients->integer ; i++ ) {
 		// send the new gamestate to all connected clients

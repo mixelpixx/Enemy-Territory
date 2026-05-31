@@ -65,65 +65,19 @@ int Sys_Milliseconds( void ) {
 Sys_SnapVector
 ================
 */
+// Portable float->long, replacing the old x87 `fld/fistp` inline asm.
+// lrint() honours the current FP rounding mode (default round-to-nearest-even),
+// matching fistp's default behaviour. NOTE: Sys_SnapVector is reachable from the
+// game via trap_SnapVector, so this is SIM-SENSITIVE — the Phase 3 demo-replay
+// harness must confirm it stays bit-identical to the 2.60b original.
 long fastftol( float f ) {
-#ifndef __GNUC__
-	static int tmp;
-
-	__asm fld f
-	__asm fistp tmp
-	// rain - WTF - why do they set the return this way?
-	__asm mov eax, tmp
-#else
-	// rain - gcc-style inline asm
-	// zinx - meh, gcc's lrint is sane, so use that. fixed inline asm too, though.
-	/*
-	asm(
-		"fld %1\n\t"
-		"fistp %0\n"
-		: "=m" (tmp) // outputs
-		: "f" (f) // inputs
-	);
-	return tmp;
-	*/
 	return lrint( f );
-#endif
 }
 
 void Sys_SnapVector( float *v ) {
-#ifndef __GNUC__
-	int i;
-	float f;
-
-	f = *v;
-	__asm fld f;
-	__asm fistp i;
-	*v = i;
-	v++;
-	f = *v;
-	__asm fld f;
-	__asm fistp i;
-	*v = i;
-	v++;
-	f = *v;
-	__asm fld f;
-	__asm fistp i;
-	*v = i;
-	/*
-	*v = fastftol(*v);
-	v++;
-	*v = fastftol(*v);
-	v++;
-	*v = fastftol(*v);
-	*/
-#else
-	// rain - gcc has different inline asm, but I'm not going to emulate
-	// that here for now...
-	*v = (float)fastftol( *v );
-	v++;
-	*v = (float)fastftol( *v );
-	v++;
-	*v = (float)fastftol( *v );
-#endif
+	v[0] = (float)lrint( v[0] );
+	v[1] = (float)lrint( v[1] );
+	v[2] = (float)lrint( v[2] );
 }
 
 /*
@@ -142,6 +96,7 @@ void Sys_SnapVector( float *v ) {
 **
 ** --------------------------------------------------------------------------------
 */
+#if defined( _M_IX86 )  // legacy 32-bit x86 CPUID/MMX/3DNow detection; unused on x64/ARM
 static void CPUID( int func, unsigned regs[4] ) {
 #ifndef __GNUC__
 	unsigned regEAX, regEBX, regECX, regEDX;
@@ -366,6 +321,7 @@ static int IsAthlon() {
 
 	return qtrue;
 }
+#endif // _M_IX86 (legacy CPU detection)
 
 int Sys_GetProcessorId( void ) {
 #if defined _M_ALPHA
@@ -402,7 +358,11 @@ int Sys_GetProcessorId( void ) {
 }
 
 int Sys_GetHighQualityCPU() {
+#if defined( _M_IX86 )
 	return ( !IsP3() && !IsAthlon() ) ? 0 : 1;
+#else
+	return 1; // any x64/ARM CPU of the 2026 era qualifies
+#endif
 }
 
 //bani - defined but not used
@@ -431,6 +391,8 @@ static void GetClockTicks( double *t ) {
 }
 #endif
 
+#if defined( _M_IX86 )  // rdtsc cycle-count timing; x86-only and obsolete on
+                        // frequency-scaling CPUs (informational MHz only).
 float Sys_RealGetCPUSpeed( void ) {
 	LARGE_INTEGER c0, c1, freq;
 	unsigned int stamp0, stamp1, cycles, ticks, tries;
@@ -534,28 +496,27 @@ float Sys_RealGetCPUSpeed( void ) {
 
 	return( (float)total / 3.f );
 }
+#endif // _M_IX86 (rdtsc CPU-speed measurement)
 
 float Sys_GetCPUSpeed( void ) {
+#if defined( _M_IX86 )
 	float cpuSpeed;
 
-#ifndef __GNUC__
 	__try
-#else
-	if ( 1 )
-#endif
 	{
 		cpuSpeed = Sys_RealGetCPUSpeed();
 	}
-#ifndef __GNUC__
 	__except( EXCEPTION_EXECUTE_HANDLER )
-#else
-	if ( 0 )
-#endif
 	{
 		cpuSpeed = 100.f;
 	}
 
 	return cpuSpeed;
+#else
+	// Informational only; not measured on x64/ARM. (TODO: read ~MHz from the
+	// registry if a real value is ever wanted.)
+	return 0.f;
+#endif
 }
 
 /*

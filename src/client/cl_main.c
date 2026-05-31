@@ -3217,6 +3217,7 @@ void CL_InitRef( void ) {
 	ri.CIN_PlayCinematic = CIN_PlayCinematic;
 	ri.CIN_RunCinematic = CIN_RunCinematic;
 
+	Com_RMTrace( "CL_InitRef: GetRefAPI..." );
 	ret = GetRefAPI( REF_API_VERSION, &ri );
 
 	Com_Printf( "-------------------------------\n" );
@@ -3226,6 +3227,7 @@ void CL_InitRef( void ) {
 	}
 
 	re = *ret;
+	Com_RMTrace( "CL_InitRef: done (refexport bound)" );
 
 	// unpause so the cgame definately gets a snapshot and renders a frame
 	Cvar_Set( "cl_paused", "0" );

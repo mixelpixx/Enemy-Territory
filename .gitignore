@@ -51,3 +51,7 @@ __pycache__/
 # Local dev assets we never want committed
 /etmain/*.pk3
 !/etmain/ui/
+
+# RM debug artifacts
+/rmtrace.log
+/build_warn.log

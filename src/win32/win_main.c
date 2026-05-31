@@ -255,7 +255,7 @@ DIRECTORY SCANNING
 void Sys_ListFilteredFiles( const char *basedir, char *subdirs, char *filter, char **list, int *numfiles ) {
 	char search[MAX_OSPATH], newsubdirs[MAX_OSPATH];
 	char filename[MAX_OSPATH];
-	int findhandle;
+	intptr_t findhandle;   // 64-bit: _findfirst handle is pointer-sized
 	struct _finddata_t findinfo;
 
 	if ( *numfiles >= MAX_FOUND_FILES - 1 ) {
@@ -325,7 +325,7 @@ char **Sys_ListFiles( const char *directory, const char *extension, char *filter
 	char        **listCopy;
 	char        *list[MAX_FOUND_FILES];
 	struct _finddata_t findinfo;
-	int findhandle;
+	intptr_t findhandle;   // 64-bit: _findfirst/_findnext use pointer-sized handles (was int -> truncation -> CRT crash)
 	int flag;
 	int i;
 
@@ -558,16 +558,24 @@ Used to load a development dll instead of a virtual machine
 extern int cl_connectedToPureServer;
 
 char* Sys_GetDLLName( const char *name ) {
+	// Arch-suffixed so the 64-bit build loads its own modules and never tries
+	// to load the incompatible 32-bit retail DLLs (qagame_mp_x86.dll etc.).
+#if defined( _M_X64 ) || defined( _WIN64 )
+	return va( "%s_mp_x86_64.dll", name );
+#elif defined( _M_ARM64 )
+	return va( "%s_mp_arm64.dll", name );
+#else
 	return va( "%s_mp_x86.dll", name );
+#endif
 }
 
 // fqpath param added 2/15/02 by T.Ray - Sys_LoadDll is only called in vm.c at this time
 // fqpath will be empty if dll not loaded, otherwise will hold fully qualified path of dll module loaded
 // fqpath buffersize must be at least MAX_QPATH+1 bytes long
-void * QDECL Sys_LoadDll( const char *name, char *fqpath, int( QDECL **entryPoint ) ( int, ... ),
-						  int ( QDECL *systemcalls )( int, ... ) ) {
+void * QDECL Sys_LoadDll( const char *name, char *fqpath, intptr_t( QDECL **entryPoint ) ( int, ... ),
+						  intptr_t ( QDECL *systemcalls )( intptr_t, ... ) ) {
 	HINSTANCE libHandle;
-	void ( QDECL * dllEntry )( int ( QDECL *syscallptr )( int, ... ) );
+	void ( QDECL * dllEntry )( intptr_t ( QDECL *syscallptr )( intptr_t, ... ) );
 	char    *basepath;
 	char    *cdpath;
 	char    *gamedir;
@@ -617,8 +625,8 @@ void * QDECL Sys_LoadDll( const char *name, char *fqpath, int( QDECL **entryPoin
 		}
 	} else {Q_strncpyz( fqpath, fn, MAX_QPATH ) ;       // added 2/15/02 by T.Ray
 	}
-	dllEntry = ( void ( QDECL * )( int ( QDECL * )( int, ... ) ) )GetProcAddress( libHandle, "dllEntry" );
-	*entryPoint = ( int ( QDECL * )( int,... ) )GetProcAddress( libHandle, "vmMain" );
+	dllEntry = ( void ( QDECL * )( intptr_t ( QDECL * )( intptr_t, ... ) ) )GetProcAddress( libHandle, "dllEntry" );
+	*entryPoint = ( intptr_t ( QDECL * )( int,... ) )GetProcAddress( libHandle, "vmMain" );
 	if ( !*entryPoint || !dllEntry ) {
 		FreeLibrary( libHandle );
 		return NULL;
@@ -1155,9 +1163,11 @@ void Sys_Init( void ) {
 		Cvar_Set( "arch", "unknown Windows variant" );
 	}
 
-	// save out a couple things in rom cvars for the renderer to access
-	Cvar_Get( "win_hinstance", va( "%i", (int)g_wv.hInstance ), CVAR_ROM );
-	Cvar_Get( "win_wndproc", va( "%i", (int)MainWndProc ), CVAR_ROM );
+	// save out a couple things in rom cvars for the renderer to access.
+	// 64-bit: these are pointers; pass them at full width (was (int) -> truncated
+	// the HINSTANCE/WNDPROC, breaking renderer window creation).
+	Cvar_Get( "win_hinstance", va( "%llu", (unsigned long long)(uintptr_t)g_wv.hInstance ), CVAR_ROM );
+	Cvar_Get( "win_wndproc", va( "%llu", (unsigned long long)(uintptr_t)MainWndProc ), CVAR_ROM );
 
 	//
 	// figure out our CPU

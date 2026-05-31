@@ -160,12 +160,20 @@ If you have questions concerning this license or the applicable additional terms
 #ifdef NDEBUG
 #ifdef _M_IX86
 #define CPUSTRING   "win-x86"
+#elif defined _M_X64
+#define CPUSTRING   "win-x86_64"
+#elif defined _M_ARM64
+#define CPUSTRING   "win-arm64"
 #elif defined _M_ALPHA
 #define CPUSTRING   "win-AXP"
 #endif
 #else
 #ifdef _M_IX86
 #define CPUSTRING   "win-x86-debug"
+#elif defined _M_X64
+#define CPUSTRING   "win-x86_64-debug"
+#elif defined _M_ARM64
+#define CPUSTRING   "win-arm64-debug"
 #elif defined _M_ALPHA
 #define CPUSTRING   "win-AXP-debug"
 #endif
@@ -602,7 +610,9 @@ long myftol( float f );
 #elif defined( __MACOS__ )
 #define myftol( x ) (long)( x )
 #else
-extern long int lrintf( float x );
+// lrintf() comes from <math.h> on modern toolchains. The original tree
+// redeclared it here for ancient compilers; that now clashes with the UCRT's
+// dllimport declaration (warning C4273). Use the CRT's lrintf directly.
 #define myftol( x ) lrintf( x )
 #endif
 

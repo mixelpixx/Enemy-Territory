@@ -371,13 +371,16 @@ The module is making a system call
 #define VMA( x ) VM_ArgPtr( args[x] )
 #endif
 
-#define VMF( x )  ( (float *)args )[x]
+// 64-bit ABI: each arg is intptr_t-wide, so a float arrives as its 32-bit bit
+// pattern in the low half of args[x]; read it back through a union.
+#define VMF( x )  _vmf( args[x] )
+static float _vmf( intptr_t x ) { floatint_t fi; fi.i = (int)x; return fi.f; }
 
 // show_bug.cgi?id=574
 extern int S_RegisterSound( const char *name, qboolean compressed );
 extern int S_GetSoundLength( sfxHandle_t sfxHandle );
 
-int SV_GameSystemCalls( int *args ) {
+intptr_t SV_GameSystemCalls( intptr_t *args ) {
 	switch ( args[0] ) {
 	case G_PRINT:
 		Com_Printf( "%s", (char *)VMA( 1 ) );
@@ -967,7 +970,7 @@ int SV_GameSystemCalls( int *args ) {
 		return 0;
 
 	case TRAP_STRNCPY:
-		return (int)strncpy( VMA( 1 ), VMA( 2 ), args[3] );
+		return (intptr_t)strncpy( VMA( 1 ), VMA( 2 ), args[3] );
 
 	case TRAP_SIN:
 		return FloatAsInt( sin( VMF( 1 ) ) );
@@ -1051,7 +1054,9 @@ static void SV_InitGameVM( qboolean restart ) {
 
 	// use the current msec count for a random seed
 	// init for this gamestate
+	Com_RMTrace( "  SV_InitGameVM: VM_Call GAME_INIT..." );
 	VM_Call( gvm, GAME_INIT, svs.time, Com_Milliseconds(), restart );
+	Com_RMTrace( "  SV_InitGameVM: GAME_INIT returned" );
 }
 
 

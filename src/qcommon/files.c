@@ -2895,7 +2895,9 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 	pakfile = FS_BuildOSPath( path, dir, "" );
 	pakfile[ strlen( pakfile ) - 1 ] = 0; // strip the trailing slash
 
+	Com_RMTrace( "    FS_AddGameDirectory(%s,%s): Sys_ListFiles...", path, dir );
 	pakfiles = Sys_ListFiles( pakfile, ".pk3", NULL, &numfiles, qfalse );
+	Com_RMTrace( "    Sys_ListFiles -> %i pk3 files", numfiles );
 
 	// sort them so that later alphabetic matches override
 	// earlier ones.  This makes pak1.pk3 override pak0.pk3
@@ -2912,7 +2914,9 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 // jpw
 	}
 
-	qsort( sorted, numfiles, 4, paksort );
+	Com_RMTrace( "    qsort %i paks...", numfiles );
+	qsort( sorted, numfiles, sizeof( char * ), paksort );   // 64-bit: elements are pointers (was hardcoded 4 -> half-pointer swaps -> heap corruption)
+	Com_RMTrace( "    qsort done; loading paks..." );
 
 	for ( i = 0 ; i < numfiles ; i++ ) {
 /*		if (Q_strncmp(sorted[i],"sp_",3)) { // JPW NERVE -- exclude sp_*
@@ -2924,9 +2928,11 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 // jpw
 */
 		pakfile = FS_BuildOSPath( path, dir, sorted[i] );
+		Com_RMTrace( "      FS_LoadZipFile[%i]: %s", i, sorted[i] );
 		if ( ( pak = FS_LoadZipFile( pakfile, sorted[i] ) ) == 0 ) {
 			continue;
 		}
+		Com_RMTrace( "      loaded %s (%i files)", sorted[i], pak->numfiles );
 		// store the game name for downloading
 		strcpy( pak->pakGamename, dir );
 
@@ -4090,10 +4096,13 @@ void FS_InitFilesystem( void ) {
 	Com_StartupVariable( "fs_restrict" );
 
 	// try to start up normally
+	Com_RMTrace( "  FS_Startup(BASEGAME)..." );
 	FS_Startup( BASEGAME );
+	Com_RMTrace( "  FS_Startup done; FS_SetRestrictions..." );
 
 	// see if we are going to allow add-ons
 	FS_SetRestrictions();
+	Com_RMTrace( "  FS_SetRestrictions done; reading default.cfg..." );
 
 	// if we can't find default.cfg, assume that the paths are
 	// busted and error out now, rather than getting an unreadable

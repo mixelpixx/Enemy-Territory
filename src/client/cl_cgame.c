@@ -565,9 +565,10 @@ The cgame module is making a system call
 ====================
 */
 #define VMA( x ) VM_ArgPtr( args[x] )
-#define VMF( x )  ( (float *)args )[x]
+#define VMF( x )  _vmf( args[x] )   // 64-bit ABI: read float bits from low half
+static float _vmf( intptr_t x ) { floatint_t fi; fi.i = (int)x; return fi.f; }
 
-int CL_CgameSystemCalls( int *args ) {
+intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 	switch ( args[0] ) {
 	case CG_PRINT:
 		Com_Printf( "%s", (char *)VMA( 1 ) );
@@ -864,11 +865,11 @@ int CL_CgameSystemCalls( int *args ) {
 
 
 	case CG_MEMSET:
-		return (int)memset( VMA( 1 ), args[2], args[3] );
+		return (intptr_t)memset( VMA( 1 ), args[2], args[3] );
 	case CG_MEMCPY:
-		return (int)memcpy( VMA( 1 ), VMA( 2 ), args[3] );
+		return (intptr_t)memcpy( VMA( 1 ), VMA( 2 ), args[3] );
 	case CG_STRNCPY:
-		return (int)strncpy( VMA( 1 ), VMA( 2 ), args[3] );
+		return (intptr_t)strncpy( VMA( 1 ), VMA( 2 ), args[3] );
 	case CG_SIN:
 		return FloatAsInt( sin( VMF( 1 ) ) );
 	case CG_COS:
@@ -1147,10 +1148,12 @@ void CL_InitCGame( void ) {
 	Com_sprintf( cl.mapname, sizeof( cl.mapname ), "maps/%s.bsp", mapname );
 
 	// load the dll
+	Com_RMTrace( "CL_InitCGame: VM_Create cgame..." );
 	cgvm = VM_Create( "cgame", CL_CgameSystemCalls, VMI_NATIVE );
 	if ( !cgvm ) {
 		Com_Error( ERR_DROP, "VM_Create on cgame failed" );
 	}
+	Com_RMTrace( "CL_InitCGame: cgame loaded; CG_INIT..." );
 	cls.state = CA_LOADING;
 
 	// init for this gamestate
@@ -1158,6 +1161,7 @@ void CL_InitCGame( void ) {
 	// otherwise server commands sent just before a gamestate are dropped
 	//bani - added clc.demoplaying, since some mods need this at init time, and drawactiveframe is too late for them
 	VM_Call( cgvm, CG_INIT, clc.serverMessageSequence, clc.lastExecutedServerCommand, clc.clientNum, clc.demoplaying );
+	Com_RMTrace( "CL_InitCGame: CG_INIT returned" );
 
 	// we will send a usercmd this frame, which
 	// will cause the server to send us the first snapshot
@@ -1169,12 +1173,15 @@ void CL_InitCGame( void ) {
 
 	// have the renderer touch all its images, so they are present
 	// on the card even if the driver does deferred loading
+	Com_RMTrace( "CL_InitCGame: re.EndRegistration..." );
 	re.EndRegistration();
+	Com_RMTrace( "CL_InitCGame: EndRegistration done; TouchMemory..." );
 
 	// make sure everything is paged in
 	if ( !Sys_LowPhysicalMemory() ) {
 		Com_TouchMemory();
 	}
+	Com_RMTrace( "CL_InitCGame: COMPLETE (cgame primed)" );
 
 	// clear anything that got printed
 	Con_ClearNotify();
@@ -1218,7 +1225,9 @@ void CL_CGameRendering( stereoFrame_t stereo ) {
 	} else {
 	}*/
 
+	{ static int fr = 0; if ( fr < 4 ) { Com_RMTrace( "CL_CGameRendering #%i: CG_DRAW_ACTIVE_FRAME (3D scene)...", fr ); } }
 	VM_Call( cgvm, CG_DRAW_ACTIVE_FRAME, cl.serverTime, stereo, clc.demoplaying );
+	{ static int fr = 0; if ( fr < 4 ) { Com_RMTrace( "CL_CGameRendering #%i: CG_DRAW_ACTIVE_FRAME returned", fr ); fr++; } }
 	VM_Debug( 0 );
 }
 

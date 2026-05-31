@@ -544,6 +544,7 @@ void SCR_UpdateScreen( void ) {
 	}
 	recursive = 1;
 
+	{ static int fr = 0; if ( fr < 3 ) { Com_RMTrace( "SCR_UpdateScreen frame %i: DrawScreenField...", fr ); } }
 	// if running in stereo, we need to draw the frame twice
 	if ( cls.glconfig.stereoEnabled ) {
 		SCR_DrawScreenField( STEREO_LEFT );
@@ -551,12 +552,14 @@ void SCR_UpdateScreen( void ) {
 	} else {
 		SCR_DrawScreenField( STEREO_CENTER );
 	}
+	{ static int fr = 0; if ( fr < 3 ) { Com_RMTrace( "SCR_UpdateScreen frame %i: DrawScreenField done; re.EndFrame...", fr ); fr++; } }
 
 	if ( com_speeds->integer ) {
 		re.EndFrame( &time_frontend, &time_backend );
 	} else {
 		re.EndFrame( NULL, NULL );
 	}
+	{ static int fr = 0; if ( fr < 3 ) { Com_RMTrace( "SCR_UpdateScreen frame %i: re.EndFrame done (frame shown)", fr ); fr++; } }
 
 	recursive = 0;
 }

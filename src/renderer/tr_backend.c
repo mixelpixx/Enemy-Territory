@@ -587,6 +587,7 @@ void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 	int dlighted, oldDlighted;
 	qboolean depthRange, oldDepthRange;
 	int i;
+	{ extern void Com_RMTrace( const char *fmt, ... ); static int n=0; if(n<3){ Com_RMTrace("RB_RenderDrawSurfList #%i: numDrawSurfs=%i", n, numDrawSurfs); n++; } }
 	drawSurf_t      *drawSurf;
 	int oldSort;
 	float originalTime;
