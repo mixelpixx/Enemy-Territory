@@ -58,6 +58,16 @@ executable runs with `build/bin` as its working directory.
 
 ## Running
 
+### Convenience scripts
+
+`scripts/play.bat` and `scripts/server.bat` launch the client and dedicated
+server with the working directory and `fs_basepath` already set. Edit the
+`ET_BASEPATH` line in each (or set the `ET_BASEPATH` environment variable) to
+point at your game-data folder. Extra arguments pass through, e.g.
+`play.bat +devmap oasis` or `server.bat +map radar`.
+
+### Manual
+
 Client, loading a map locally (point `fs_basepath` at the directory that
 *contains* `etmain`):
 
