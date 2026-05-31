@@ -558,7 +558,15 @@ Used to load a development dll instead of a virtual machine
 extern int cl_connectedToPureServer;
 
 char* Sys_GetDLLName( const char *name ) {
+	// Arch-suffixed so the 64-bit build loads its own modules and never tries
+	// to load the incompatible 32-bit retail DLLs (qagame_mp_x86.dll etc.).
+#if defined( _M_X64 ) || defined( _WIN64 )
+	return va( "%s_mp_x86_64.dll", name );
+#elif defined( _M_ARM64 )
+	return va( "%s_mp_arm64.dll", name );
+#else
 	return va( "%s_mp_x86.dll", name );
+#endif
 }
 
 // fqpath param added 2/15/02 by T.Ray - Sys_LoadDll is only called in vm.c at this time
