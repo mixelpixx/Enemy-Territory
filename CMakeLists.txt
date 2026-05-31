@@ -90,6 +90,7 @@ add_subdirectory(src/client)     # -> etrm_client (static; cgame/render glue + s
 include(EngineCore)
 include(Dedicated)          # etrmded (Windows-first, no SDL)
 include(Client)             # etrm (native Win32 client; SDL2 swap follows)
+include(GameModule)         # qagame_mp_x86_64.dll (native 64-bit server game module)
 
 # ----------------------------------------------------------------------------
 #  Remaining engine targets — added in subsequent Phase 1 commits.
