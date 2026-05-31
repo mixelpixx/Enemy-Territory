@@ -1054,7 +1054,9 @@ static void SV_InitGameVM( qboolean restart ) {
 
 	// use the current msec count for a random seed
 	// init for this gamestate
+	Com_RMTrace( "  SV_InitGameVM: VM_Call GAME_INIT..." );
 	VM_Call( gvm, GAME_INIT, svs.time, Com_Milliseconds(), restart );
+	Com_RMTrace( "  SV_InitGameVM: GAME_INIT returned" );
 }
 
 

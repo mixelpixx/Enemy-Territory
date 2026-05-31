@@ -844,6 +844,7 @@ void        Com_EndRedirect( void );
 int QDECL Com_VPrintf( const char *fmt, va_list argptr ) _attribute( ( format( printf,1,0 ) ) ); // conforms to vprintf prototype for print callback passing
 void QDECL Com_Printf( const char *fmt, ... ) _attribute( ( format( printf,1,2 ) ) ); // this one calls to Com_VPrintf now
 void QDECL Com_DPrintf( const char *fmt, ... ) _attribute( ( format( printf,1,2 ) ) );
+void Com_RMTrace( const char *fmt, ... );   // RM: crash-proof early trace log (debug)
 void QDECL Com_Error( int code, const char *fmt, ... ) _attribute( ( format( printf,2,3 ) ) );
 void        Com_Quit_f( void );
 int         Com_EventLoop( void );

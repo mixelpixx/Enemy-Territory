@@ -1604,8 +1604,9 @@ void Com_InitHunkMemory( void ) {
 	if ( !s_hunkData ) {
 		Com_Error( ERR_FATAL, "Hunk data failed to allocate %i megs", s_hunkTotal / ( 1024 * 1024 ) );
 	}
-	// cacheline align
-	s_hunkData = ( byte * )( ( (int)s_hunkData + 31 ) & ~31 );
+	// cacheline align (use intptr_t: casting a 64-bit pointer through int
+	// truncates the hunk base to a garbage low address -> heap corruption)
+	s_hunkData = ( byte * )( ( (intptr_t)s_hunkData + 31 ) & ~( (intptr_t)31 ) );
 	Hunk_Clear();
 
 	Cmd_AddCommand( "meminfo", Com_Meminfo_f );
@@ -2686,12 +2687,52 @@ qboolean Com_WriteProfile( char *profile_path ) {
 Com_Init
 =================
 */
+/*
+=================
+Com_RMTrace
+
+RM remaster: crash-proof early/verbose trace log. Opens, writes, flushes and
+closes the file on every call so the last line survives even a hard crash
+(access violation / heap corruption) — invaluable before the console/log
+subsystems are up. Path is fixed + absolute so it's found regardless of cwd.
+Toggle the body off once the engine is stable.
+=================
+*/
+void Com_RMTrace( const char *fmt, ... ) {
+	static int enabled = -1;        // -1 = unchecked, 0 = off, 1 = on
+	va_list argptr;
+	char    msg[2048];
+	const char *path;
+	FILE    *f;
+
+	if ( enabled == -1 ) {
+		path = getenv( "ETRM_TRACE" );
+		enabled = ( path && path[0] ) ? 1 : 0;
+	}
+	if ( !enabled ) {
+		return;
+	}
+
+	va_start( argptr, fmt );
+	Q_vsnprintf( msg, sizeof( msg ), fmt, argptr );
+	va_end( argptr );
+
+	// ETRM_TRACE holds the log file path
+	f = fopen( getenv( "ETRM_TRACE" ), "a" );
+	if ( f ) {
+		fputs( msg, f );
+		fputc( '\n', f );
+		fclose( f );
+	}
+}
+
 void Com_Init( char *commandLine ) {
 	char    *s;
 	int pid;
 	// TTimo gcc warning: variable `safeMode' might be clobbered by `longjmp' or `vfork'
 	volatile qboolean safeMode = qtrue;
 
+	Com_RMTrace( "==== Com_Init BEGIN ====" );
 	Com_Printf( "%s %s %s\n", Q3_VERSION, CPUSTRING, __DATE__ );
 
 	if ( setjmp( abortframe ) ) {
@@ -2701,17 +2742,22 @@ void Com_Init( char *commandLine ) {
 	// bk001129 - do this before anything else decides to push events
 	Com_InitPushEvent();
 
+	Com_RMTrace( "Com_InitSmallZoneMemory..." );
 	Com_InitSmallZoneMemory();
+	Com_RMTrace( "Cvar_Init..." );
 	Cvar_Init();
 
 	// prepare enough of the subsystems to handle
 	// cvar and command buffer management
+	Com_RMTrace( "Com_ParseCommandLine..." );
 	Com_ParseCommandLine( commandLine );
 
 	Swap_Init();
 	Cbuf_Init();
 
+	Com_RMTrace( "Com_InitZoneMemory..." );
 	Com_InitZoneMemory();
+	Com_RMTrace( "Cmd_Init..." );
 	Cmd_Init();
 
 	// override anything from the config files with command line args
@@ -2741,10 +2787,13 @@ void Com_Init( char *commandLine ) {
 	// done early so bind command exists
 	CL_InitKeyCommands();
 
+	Com_RMTrace( "FS_InitFilesystem..." );
 	FS_InitFilesystem();
 
+	Com_RMTrace( "Com_InitJournaling..." );
 	Com_InitJournaling();
 
+	Com_RMTrace( "Com_GetGameInfo..." );
 	Com_GetGameInfo();
 
 	Cbuf_AddText( "exec default.cfg\n" );
@@ -2818,7 +2867,9 @@ void Com_Init( char *commandLine ) {
 	com_dedicated = Cvar_Get( "dedicated", "0", CVAR_LATCH );
 #endif
 	// allocate the stack based hunk allocator
+	Com_RMTrace( "Com_InitHunkMemory..." );
 	Com_InitHunkMemory();
+	Com_RMTrace( "Com_InitHunkMemory done; configs exec'd" );
 
 	// if any archived cvars are modified after this, we will trigger a writing
 	// of the config file
@@ -2886,16 +2937,22 @@ void Com_Init( char *commandLine ) {
 	s = va( "%s %s %s", Q3_VERSION, CPUSTRING, __DATE__ );
 	com_version = Cvar_Get( "version", s, CVAR_ROM | CVAR_SERVERINFO );
 
+	Com_RMTrace( "Sys_Init..." );
 	Sys_Init();
+	Com_RMTrace( "Netchan_Init..." );
 	Netchan_Init( Com_Milliseconds() & 0xffff );    // pick a port value that should be nice and random
+	Com_RMTrace( "VM_Init..." );
 	VM_Init();
+	Com_RMTrace( "SV_Init..." );
 	SV_Init();
 
 	com_dedicated->modified = qfalse;
 	if ( !com_dedicated->integer ) {
+		Com_RMTrace( "CL_Init..." );
 		CL_Init();
 		Sys_ShowConsole( com_viewlog->integer, qfalse );
 	}
+	Com_RMTrace( "==== Com_Init END (entering frame loop) ====" );
 
 	// set com_frameTime so that if a map is started on the
 	// command line it will still be able to count on com_frameTime
