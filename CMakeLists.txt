@@ -62,6 +62,8 @@ set(ETRM_SRC "${CMAKE_SOURCE_DIR}/src")
 add_subdirectory(src/jpeg-6)     # -> etrm_jpeg   (static)  [USE_INTERNAL_JPEG]
 add_subdirectory(src/botlib)     # -> etrm_botlib (static, -DBOTLIB)
 add_subdirectory(src/splines)    # -> etrm_splines(static, C++)
+add_subdirectory(src/renderer)   # -> etrm_renderer (static, fixed-function GL1)
+add_subdirectory(src/client)     # -> etrm_client (static; cgame/render glue + sound)
 
 # ----------------------------------------------------------------------------
 #  Engine core (server + qcommon + shared game math)
