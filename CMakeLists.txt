@@ -58,17 +58,18 @@ include(CompilerWarnings)
 set(ETRM_SRC "${CMAKE_SOURCE_DIR}/src")
 
 # ----------------------------------------------------------------------------
-#  SDL2 — platform layer for the client (video/input/sound). Cross-platform,
-#  zlib-licensed (GPLv3-compatible). Point SDL2_DIR at the dev libs; the VC
-#  devel package ships sdl2-config.cmake providing the SDL2::SDL2 targets.
+#  SDL2 — optional for now. The Windows client currently uses the native Win32
+#  platform layer; SDL2 is intended for the planned cross-platform layer
+#  (video/input/sound on Linux/macOS). It is detected if present (set SDL2_DIR
+#  to a directory containing sdl2-config.cmake) but is NOT required to build.
 # ----------------------------------------------------------------------------
 if(BUILD_CLIENT)
-    if(NOT DEFINED SDL2_DIR AND WIN32)
-        set(SDL2_DIR "C:/repo/et-deps/SDL2-2.32.10/cmake"
-            CACHE PATH "Directory containing sdl2-config.cmake")
+    find_package(SDL2 QUIET)
+    if(SDL2_FOUND)
+        message(STATUS "ET-RM: SDL2 ${SDL2_VERSION} found (available for the future platform layer)")
+    else()
+        message(STATUS "ET-RM: SDL2 not found (not required yet; native Win32 layer in use)")
     endif()
-    find_package(SDL2 REQUIRED)
-    message(STATUS "ET-RM: SDL2 ${SDL2_VERSION} found")
 endif()
 
 # ----------------------------------------------------------------------------

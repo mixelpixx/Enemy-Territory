@@ -52,6 +52,7 @@ __pycache__/
 /etmain/*.pk3
 !/etmain/ui/
 
-# RM debug artifacts
-/rmtrace.log
+# RM debug artifacts (Com_RMTrace output, captured build logs)
+/rmtrace*.log
 /build_warn.log
+/build-*/

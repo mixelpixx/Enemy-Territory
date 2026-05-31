@@ -7,7 +7,7 @@ This file tracks every piece of code ported into the **Enemy Territory RM**
 
 The RM tree descends from the **Wolfenstein: Enemy Territory GPL Source Release**
 (id Software, 20 August 2010), licensed under the **GNU GPL v3** ("version 3 of
-the License, or (at your option) any later version" — see [`COPYING.txt`](COPYING.txt)
+the License, or (at your option) any later version" — see [`COPYING.txt`](../COPYING.txt)
 and the header in every source file). Unlike the 1999 Quake 3 release (GPLv2), the
 2010 RTCW/ET releases are **GPLv3**. The whole RM work is therefore **GPLv3**.
 
