@@ -460,9 +460,11 @@ void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 		return;
 	}
 
+	{ static int n=0; if(n<3){ Com_RMTrace("SCR_DrawScreenField: uivm UI_IS_FULLSCREEN... (state=%i)", cls.state); } }
 	// if the menu is going to cover the entire screen, we
 	// don't need to render anything under it
 	if ( !VM_Call( uivm, UI_IS_FULLSCREEN ) ) {
+		{ static int n=0; if(n<3){ Com_RMTrace("SCR_DrawScreenField: UI_IS_FULLSCREEN ok; drawing state %i", cls.state); n++; } }
 		switch ( cls.state ) {
 		default:
 			Com_Error( ERR_FATAL, "SCR_DrawScreenField: bad cls.state" );
@@ -473,7 +475,9 @@ void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 		case CA_DISCONNECTED:
 			// force menu up
 			S_StopAllSounds();
+			{ static int n=0; if(n<3){ Com_RMTrace("SCR_DrawScreenField: VM_Call UI_SET_ACTIVE_MENU(MAIN)..."); } }
 			VM_Call( uivm, UI_SET_ACTIVE_MENU, UIMENU_MAIN );
+			{ static int n=0; if(n<3){ Com_RMTrace("SCR_DrawScreenField: UI_SET_ACTIVE_MENU returned"); n++; } }
 			break;
 		case CA_CONNECTING:
 		case CA_CHALLENGING:
@@ -509,6 +513,7 @@ void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 
 	// the menu draws next
 	if ( cls.keyCatchers & KEYCATCH_UI && uivm ) {
+		{ static int n=0; if(n<3){ Com_RMTrace("SCR_DrawScreenField: VM_Call UI_REFRESH (menu)..."); n++; } }
 		VM_Call( uivm, UI_REFRESH, cls.realtime );
 	}
 

@@ -93,7 +93,9 @@ typedef struct {
 	byte file[65536];
 	short sqrTable[256];
 
-	unsigned int mcomp[256];
+	intptr_t mcomp[256];   // 64-bit: motion-comp offsets are signed & added to a byte* (status[index] + mcomp).
+	                       // Was 'unsigned int': a negative offset zero-extended to a ~+4GB jump on x64 -> crash.
+	                       // (On 32-bit the unsigned wraparound happened to work.)
 	byte                *qStatus[2][32768];
 
 	long oldXOff, oldYOff, oldysize, oldxsize;
