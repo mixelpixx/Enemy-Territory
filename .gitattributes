@@ -1,0 +1,56 @@
+# Enemy Territory RM — line-ending & binary normalization
+# Default: let git decide text vs binary, normalize to LF in the repo.
+* text=auto
+
+# Source: always LF in the repo so cross-platform diffs are clean.
+*.c    text eol=lf
+*.h    text eol=lf
+*.cpp  text eol=lf
+*.cc   text eol=lf
+*.hpp  text eol=lf
+*.glsl text eol=lf
+*.shader text eol=lf
+*.cfg  text eol=lf
+*.menu text eol=lf
+*.script text eol=lf
+
+# Build / tooling
+CMakeLists.txt text eol=lf
+*.cmake text eol=lf
+*.py   text eol=lf
+*.sh   text eol=lf eol=lf
+*.md   text eol=lf
+
+# Windows-only tooling keeps CRLF
+*.bat  text eol=crlf
+*.sln  text eol=crlf
+*.vcproj text eol=crlf
+*.vcxproj text eol=crlf
+*.rc   text eol=crlf
+
+# Binary assets — never touch.
+*.bmp  binary
+*.ico  binary
+*.tga  binary
+*.jpg  binary
+*.jpeg binary
+*.png  binary
+*.wav  binary
+*.ogg  binary
+*.pk3  binary
+*.zip  binary
+*.dll  binary
+*.so   binary
+*.dylib binary
+*.exe  binary
+*.lib  binary
+*.a    binary
+*.qvm  binary
+*.bsp  binary
+*.md3  binary
+*.mdc  binary
+*.mds  binary
+*.mdm  binary
+*.mdx  binary
+*.ttf  binary
+*.pdf  binary

@@ -1,0 +1,53 @@
+# Enemy Territory RM — build & editor artifacts
+
+# CMake / build output
+/build/
+/build-*/
+/out/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+*.cmake.stamp
+compile_commands.json
+
+# Legacy SCons artifacts (build system retired in Phase 1)
+/src/build/
+.sconsign.dblite
+site.conf
+*.pyc
+__pycache__/
+
+# Compiled objects / libs / binaries
+*.o
+*.obj
+*.lib
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.pdb
+*.ilk
+*.exp
+*.qvm
+
+# IDE / editor
+.vs/
+*.user
+*.suo
+*.sln.docstates
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+
+# macOS bundle staging
+*.app/
+
+# Local dev assets we never want committed
+/etmain/*.pk3
+!/etmain/ui/
