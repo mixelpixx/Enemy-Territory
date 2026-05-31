@@ -29,15 +29,19 @@ set(SHARED_SOURCES
     ${GM_DIR}/q_shared.c
     ${GM_DIR}/q_math.c)
 
-add_library(etrm_core STATIC
-    ${SERVER_SOURCES}
-    ${QCOMMON_SOURCES}
-    ${SHARED_SOURCES})
+# Exposed for the executables. The core differs between client and dedicated
+# builds (the DEDICATED define spans common.c/cvar.c/files.c/net_chan.c and
+# sv_bot/sv_game/sv_init), so it is compiled INTO each executable target with
+# the right define rather than shared as one static lib.
+set(ETRM_CORE_SOURCES ${SERVER_SOURCES} ${QCOMMON_SOURCES} ${SHARED_SOURCES})
 
-target_include_directories(etrm_core PUBLIC
+set(ETRM_CORE_INCLUDE_DIRS
     ${QC_DIR} ${GM_DIR} ${SV_DIR}
     ${ETRM_SRC}/client ${ETRM_SRC}/renderer
     ${ETRM_SRC}/cgame  ${ETRM_SRC}/ui
     ${ETRM_SRC}/botlib)
 
+# Compile-check lib (non-dedicated flavour); also the future client's core.
+add_library(etrm_core STATIC ${ETRM_CORE_SOURCES})
+target_include_directories(etrm_core PUBLIC ${ETRM_CORE_INCLUDE_DIRS})
 etrm_apply_common_definitions(etrm_core)

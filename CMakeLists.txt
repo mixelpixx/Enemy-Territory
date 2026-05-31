@@ -72,12 +72,12 @@ add_subdirectory(src/splines)    # -> etrm_splines(static, C++)
 #  in a later commit. vm_x86.c is OMITTED on non-x86 (interpreter only, Phase 1).
 # ----------------------------------------------------------------------------
 include(EngineCore)
+include(Dedicated)          # etrmded (Windows-first, no SDL)
 
 # ----------------------------------------------------------------------------
 #  Remaining engine targets — added in subsequent Phase 1 commits.
 # ----------------------------------------------------------------------------
-# add_subdirectory(src/sys)      # SDL2 platform layer (todo)
-# renderer + client sources, then the etrm / etrmded executables (todo)
+# SDL2 client: renderer1 + client + src/sys SDL2 layer, then the etrm executable
 
 message(STATUS "ET-RM configured: ${CMAKE_SYSTEM_NAME} / ${CMAKE_C_COMPILER_ID} / "
                "${CMAKE_SIZEOF_VOID_P}*8-bit / build=${CMAKE_BUILD_TYPE}")
