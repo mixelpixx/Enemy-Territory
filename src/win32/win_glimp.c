@@ -1384,18 +1384,20 @@ void GLimp_Init( void ) {
 		ri.Error( ERR_VID_FATAL, "GLimp_Init() - incorrect operating system\n" );
 	}
 
-	// save off hInstance and wndproc
+	// save off hInstance and wndproc (64-bit: full-width pointers, see win_main.c)
 	cv = ri.Cvar_Get( "win_hinstance", "", 0 );
-	sscanf( cv->string, "%i", (int *)&g_wv.hInstance );
+	sscanf( cv->string, "%llu", (unsigned long long *)&g_wv.hInstance );
 
 	cv = ri.Cvar_Get( "win_wndproc", "", 0 );
-	sscanf( cv->string, "%i", (int *)&glw_state.wndproc );
+	sscanf( cv->string, "%llu", (unsigned long long *)&glw_state.wndproc );
 
 	r_allowSoftwareGL = ri.Cvar_Get( "r_allowSoftwareGL", "0", CVAR_LATCH );
 	r_maskMinidriver = ri.Cvar_Get( "r_maskMinidriver", "0", CVAR_LATCH );
 
 	// load appropriate DLL and initialize subsystem
+	{ extern void Com_RMTrace( const char *fmt, ... ); Com_RMTrace( "GLimp_Init: GLW_StartOpenGL (create window + GL context)..." ); }
 	GLW_StartOpenGL();
+	{ extern void Com_RMTrace( const char *fmt, ... ); Com_RMTrace( "GLimp_Init: GL context up; querying GL strings..." ); }
 
 	// get our config strings
 	Q_strncpyz( glConfig.vendor_string, qglGetString( GL_VENDOR ), sizeof( glConfig.vendor_string ) );

@@ -1163,9 +1163,11 @@ void Sys_Init( void ) {
 		Cvar_Set( "arch", "unknown Windows variant" );
 	}
 
-	// save out a couple things in rom cvars for the renderer to access
-	Cvar_Get( "win_hinstance", va( "%i", (int)g_wv.hInstance ), CVAR_ROM );
-	Cvar_Get( "win_wndproc", va( "%i", (int)MainWndProc ), CVAR_ROM );
+	// save out a couple things in rom cvars for the renderer to access.
+	// 64-bit: these are pointers; pass them at full width (was (int) -> truncated
+	// the HINSTANCE/WNDPROC, breaking renderer window creation).
+	Cvar_Get( "win_hinstance", va( "%llu", (unsigned long long)(uintptr_t)g_wv.hInstance ), CVAR_ROM );
+	Cvar_Get( "win_wndproc", va( "%llu", (unsigned long long)(uintptr_t)MainWndProc ), CVAR_ROM );
 
 	//
 	// figure out our CPU

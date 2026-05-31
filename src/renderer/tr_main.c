@@ -1374,7 +1374,11 @@ qsort replacement
 
 =================
 */
-#define SWAP_DRAW_SURF( a,b ) temp = ( (int *)a )[0]; ( (int *)a )[0] = ( (int *)b )[0]; ( (int *)b )[0] = temp; temp = ( (int *)a )[1]; ( (int *)a )[1] = ( (int *)b )[1]; ( (int *)b )[1] = temp;
+// 64-bit: drawSurf_t is 16 bytes (the surfaceType_t* is 8 + padding), not 8 as
+// on 32-bit. The old macro swapped only the first 8 bytes, corrupting the
+// `surface` pointer -> the backend then dereferenced garbage. Swap the whole
+// struct so it is correct for any element size/layout.
+#define SWAP_DRAW_SURF( a,b ) { drawSurf_t swaptmp_ = *( (drawSurf_t *)( a ) ); *( (drawSurf_t *)( a ) ) = *( (drawSurf_t *)( b ) ); *( (drawSurf_t *)( b ) ) = swaptmp_; }
 
 /* this parameter defines the cutoff between using quick sort and
    insertion sort for arrays; arrays with lengths shorter or equal to the
@@ -1416,9 +1420,8 @@ void qsortFast(
 	int stkptr;                 /* stack for saving sub-array to be processed */
 	int temp;
 
-	if ( sizeof( drawSurf_t ) != 8 ) {
-		ri.Error( ERR_DROP, "change SWAP_DRAW_SURF macro" );
-	}
+	/* SWAP_DRAW_SURF now swaps a full drawSurf_t, so any element size is fine
+	   (the old sizeof()==8 assumption was 32-bit-only). */
 
 	/* Note: the number of stack entries required is no more than
 	   1 + log2(size), so 30 is sufficient for any array */
@@ -1885,6 +1888,7 @@ or a mirror / remote location
 */
 void R_RenderView( viewParms_t *parms ) {
 	int firstDrawSurf;
+	{ extern void Com_RMTrace( const char *fmt, ... ); static int n=0; if(n<3){ Com_RMTrace("R_RenderView #%i (entry)", n); n++; } }
 
 	if ( parms->viewportWidth <= 0 || parms->viewportHeight <= 0 ) {
 		return;
@@ -1922,9 +1926,12 @@ void R_RenderView( viewParms_t *parms ) {
 	// based on world bounds zfar or fog bounds
 	// R_SetupFrustum ();
 
+	{ extern void Com_RMTrace( const char *fmt, ... ); static int n=0; if(n<2){ Com_RMTrace("R_RenderView: R_GenerateDrawSurfs..."); } }
 	R_GenerateDrawSurfs();
+	{ extern void Com_RMTrace( const char *fmt, ... ); static int n=0; if(n<2){ Com_RMTrace("R_RenderView: GenerateDrawSurfs done (%i surfs); R_SortDrawSurfs...", tr.refdef.numDrawSurfs - firstDrawSurf); } }
 
 	R_SortDrawSurfs( tr.refdef.drawSurfs + firstDrawSurf, tr.refdef.numDrawSurfs - firstDrawSurf );
+	{ extern void Com_RMTrace( const char *fmt, ... ); static int n=0; if(n<2){ Com_RMTrace("R_RenderView: SortDrawSurfs done"); n++; } }
 
 	// draw main system development information (surface outlines, etc)
 	R_FogOff();

@@ -496,6 +496,7 @@ to handle mirrors,
 void RE_RenderScene( const refdef_t *fd ) {
 	viewParms_t parms;
 	int startTime;
+	{ extern void Com_RMTrace( const char *fmt, ... ); static int n=0; if(n<3){ Com_RMTrace("RE_RenderScene #%i (entry)", n); n++; } }
 
 	if ( !tr.registered ) {
 		return;
