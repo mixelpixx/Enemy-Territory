@@ -57,6 +57,20 @@ include(CompilerWarnings)
 set(ETRM_SRC "${CMAKE_SOURCE_DIR}/src")
 
 # ----------------------------------------------------------------------------
+#  SDL2 — platform layer for the client (video/input/sound). Cross-platform,
+#  zlib-licensed (GPLv3-compatible). Point SDL2_DIR at the dev libs; the VC
+#  devel package ships sdl2-config.cmake providing the SDL2::SDL2 targets.
+# ----------------------------------------------------------------------------
+if(BUILD_CLIENT)
+    if(NOT DEFINED SDL2_DIR AND WIN32)
+        set(SDL2_DIR "C:/repo/et-deps/SDL2-2.32.10/cmake"
+            CACHE PATH "Directory containing sdl2-config.cmake")
+    endif()
+    find_package(SDL2 REQUIRED)
+    message(STATUS "ET-RM: SDL2 ${SDL2_VERSION} found")
+endif()
+
+# ----------------------------------------------------------------------------
 #  Bundled third-party libraries (self-contained; no engine/platform deps)
 # ----------------------------------------------------------------------------
 add_subdirectory(src/jpeg-6)     # -> etrm_jpeg   (static)  [USE_INTERNAL_JPEG]
