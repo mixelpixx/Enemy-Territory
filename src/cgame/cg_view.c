@@ -1003,9 +1003,6 @@ static int CG_CalcFov( void ) {
 		BG_CalcFovHorPlus( fov_x, cg.refdef_current->width, cg.refdef_current->height, &fov_x, &fov_y );
 	}
 	// Original square-pixel derivation (now inside BG_CalcFovHorPlus):
-	//x = cg.refdef_current->width / tan( fov_x / 360 * M_PI );
-	//fov_y = atan2( cg.refdef_current->height, x );
-	//fov_y = fov_y * 360 / M_PI;
 
 	// warp if underwater
 	//if ( cg_pmove.waterlevel == 3 ) {

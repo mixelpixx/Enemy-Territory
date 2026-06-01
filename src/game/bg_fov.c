@@ -13,7 +13,7 @@
 #include <math.h>
 
 #ifndef M_PI
-#define M_PI 3.14159265358979323846f
+#define M_PI 3.14159265358979323846
 #endif
 
 void BG_CalcFovHorPlus( float fov43ref, int width, int height, float *fov_x, float *fov_y ) {
