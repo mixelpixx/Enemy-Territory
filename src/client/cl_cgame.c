@@ -1097,12 +1097,21 @@ void CL_UpdateLevelHunkUsage( void ) {
 
 		handle = FS_FOpenFileWrite( memlistfile );
 		if ( handle < 0 ) {
-			Com_Error( ERR_DROP, "cannot create %s\n", memlistfile );
+			// hunkusage.dat only drives the loading-progress bar; a write
+			// failure must not be fatal (e.g. read-only homepath).
+			Com_Printf( S_COLOR_YELLOW "WARNING: cannot create %s (loading bar may be inaccurate)\n", memlistfile );
+			Z_Free( buf );
+			Z_Free( outbuf );
+			return;
 		}
 		// input file is parsed, now output to the new file
 		len = strlen( outbuf );
 		if ( FS_Write( (void *)outbuf, len, handle ) != len ) {
-			Com_Error( ERR_DROP, "cannot write to %s\n", memlistfile );
+			Com_Printf( S_COLOR_YELLOW "WARNING: cannot write to %s (loading bar may be inaccurate)\n", memlistfile );
+			FS_FCloseFile( handle );
+			Z_Free( buf );
+			Z_Free( outbuf );
+			return;
 		}
 		FS_FCloseFile( handle );
 
@@ -1112,7 +1121,9 @@ void CL_UpdateLevelHunkUsage( void ) {
 	// now append the current map to the current file
 	FS_FOpenFileByMode( memlistfile, &handle, FS_APPEND );
 	if ( handle < 0 ) {
-		Com_Error( ERR_DROP, "cannot write to hunkusage.dat, check disk full\n" );
+		// non-fatal: just the loading-progress estimate for this map
+		Com_Printf( S_COLOR_YELLOW "WARNING: cannot append to hunkusage.dat (loading bar may be inaccurate)\n" );
+		return;
 	}
 	Com_sprintf( outstr, sizeof( outstr ), "%s %i\n", cl.mapname, memusage );
 	FS_Write( outstr, strlen( outstr ), handle );
