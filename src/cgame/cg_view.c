@@ -913,7 +913,6 @@ Fixed fov at intermissions, otherwise account for fov variable and zooms.
 
 static int CG_CalcFov( void ) {
 	static float lastfov = 90;      // for transitions back from zoomed in modes
-	float x;
 	float phase;
 	float v;
 	int contents;
@@ -995,12 +994,18 @@ static int CG_CalcFov( void ) {
 		fov_x = fov_y = 60.f;
 	}
 
-	// Arnout: this is weird... (but ensures square pixel ratio!)
-	x = cg.refdef_current->width / tan( fov_x / 360 * M_PI );
-	fov_y = atan2( cg.refdef_current->height, x );
-	fov_y = fov_y * 360 / M_PI;
-	// And this seems better - but isn't really
-	//fov_y = fov_x / cgs.glconfig.windowAspect;
+	// RM: Hor+ widescreen. Treat fov_x (from cg_fov / zoom / mg42) as the
+	// 4:3-reference horizontal fov; anchor the vertical fov to 4:3 and widen
+	// the horizontal fov for the actual aspect. Presentation only -- does not
+	// affect the simulation. The showGameView special case (fov_x = fov_y = 60)
+	// is left untouched so the limbo/game view keeps its original fixed fov.
+	if ( !cg.showGameView ) {
+		BG_CalcFovHorPlus( fov_x, cg.refdef_current->width, cg.refdef_current->height, &fov_x, &fov_y );
+	}
+	// Original square-pixel derivation (now inside BG_CalcFovHorPlus):
+	//x = cg.refdef_current->width / tan( fov_x / 360 * M_PI );
+	//fov_y = atan2( cg.refdef_current->height, x );
+	//fov_y = fov_y * 360 / M_PI;
 
 	// warp if underwater
 	//if ( cg_pmove.waterlevel == 3 ) {

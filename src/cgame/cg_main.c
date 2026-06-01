@@ -337,7 +337,7 @@ cvarTable_t cvarTable[] = {
 	{ &cg_zoomStepSniper, "cg_zoomStepSniper", "2", CVAR_ARCHIVE },
 	{ &cg_zoomStepSnooper, "cg_zoomStepSnooper", "5", CVAR_ARCHIVE },
 	{ &cg_zoomStepFG, "cg_zoomStepFG", "10", CVAR_ARCHIVE },          //----(SA)	added
-	{ &cg_fov, "cg_fov", "90", CVAR_ARCHIVE },
+	{ &cg_fov, "cg_fov", "100", CVAR_ARCHIVE },   // RM: wider modern default (4:3-reference; hor+ widens for widescreen)
 	{ &cg_letterbox, "cg_letterbox", "0", CVAR_TEMP },    //----(SA)	added
 	{ &cg_stereoSeparation, "cg_stereoSeparation", "0.4", CVAR_ARCHIVE  },
 	{ &cg_shadows, "cg_shadows", "1", CVAR_ARCHIVE  },
