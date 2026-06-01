@@ -23,12 +23,12 @@ set(CLIENT_PLATFORM_SOURCES
     ${ETRM_SRC}/win32/win_shared.c
     ${ETRM_SRC}/win32/win_wndproc.c
     ${ETRM_SRC}/win32/win_syscon.c
-    # client-only native I/O (the SDL2 swap targets these five)
-    ${ETRM_SRC}/win32/win_input.c    # DirectInput
-    ${ETRM_SRC}/win32/win_glimp.c    # WGL context
-    ${ETRM_SRC}/win32/win_qgl.c      # GL proc table
-    ${ETRM_SRC}/win32/win_gamma.c
+    # client-only native I/O
+    ${ETRM_SRC}/win32/win_input.c    # DirectInput (SDL input swap is Task C)
     ${ETRM_SRC}/win32/win_snd.c      # DirectSound
+    # SDL2 video platform layer (Task B1+B2) — replaces win_glimp/win_qgl/win_gamma
+    ${ETRM_SRC}/sys/sdl_glimp.c      # SDL2 window + GL context
+    ${ETRM_SRC}/sys/sdl_qgl.c        # GL proc table via SDL_GL_GetProcAddress
     ${ETRM_SRC}/qcommon/dl_main_stubs.c)
 
 add_executable(etrm
@@ -39,7 +39,8 @@ set_target_properties(etrm PROPERTIES WIN32_EXECUTABLE ON)  # WinMain
 
 target_include_directories(etrm PRIVATE
     ${ETRM_CORE_INCLUDE_DIRS}
-    ${ETRM_SRC}/win32)
+    ${ETRM_SRC}/win32
+    ${ETRM_SRC}/sys)
 
 target_link_libraries(etrm PRIVATE
     etrm_renderer
@@ -47,7 +48,19 @@ target_link_libraries(etrm PRIVATE
     etrm_jpeg
     etrm_botlib
     etrm_splines
+    SDL2::SDL2
     opengl32 gdi32 user32 winmm wsock32 ws2_32 iphlpapi
     ole32 advapi32 dinput8 dsound dxguid comctl32)
 
+# ET has its own WinMain (win_main.c, WIN32_EXECUTABLE). Tell SDL not to
+# define/hook main — do NOT link SDL2main, or WinMain would conflict. We call
+# SDL_SetMainReady() in GLimp_Init instead.
+target_compile_definitions(etrm PRIVATE SDL_MAIN_HANDLED)
+
 etrm_apply_common_definitions(etrm)
+
+# Stage the SDL2 runtime DLL next to the executable (SDL2d.dll in Debug — the
+# generator expression resolves the right name automatically).
+add_custom_command(TARGET etrm POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:SDL2::SDL2> $<TARGET_FILE_DIR:etrm>)
