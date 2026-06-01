@@ -44,6 +44,13 @@ etrm_apply_common_definitions(etrm_feeltest)
 set(ETRM_PMOVE_GOLDEN "c1a6e7471a5e279d" CACHE STRING "Golden pmove feel hash (x64/MSVC)")
 enable_testing()
 add_test(NAME pmove_feel COMMAND etrm_feeltest)
+
+# RM: standalone unit test for the hor+ widescreen FOV helper (pure C + math).
+add_executable(etrm_fovtest
+    ${CMAKE_SOURCE_DIR}/tests/fov_test.c
+    ${GM_DIR}/bg_fov.c)
+target_include_directories(etrm_fovtest PRIVATE ${GM_DIR} ${ETRM_SRC}/qcommon)
+add_test(NAME fov_math COMMAND etrm_fovtest)
 set_tests_properties(pmove_feel PROPERTIES
     PASS_REGULAR_EXPRESSION "ETRM_PMOVE_FEEL_HASH ${ETRM_PMOVE_GOLDEN}"
     FAIL_REGULAR_EXPRESSION "Com_Error")
