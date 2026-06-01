@@ -279,6 +279,13 @@ void GLimp_Init( void ) {
 	// because the client uses SDL_MAIN_HANDLED (ET has its own WinMain)
 	SDL_SetMainReady();
 
+	// Make the process per-monitor DPI-aware BEFORE initializing SDL video.
+	// Without this, on a display with Windows scaling != 100%, SDL reports the
+	// scaled *logical* desktop size (e.g. 1536x960 for a 1920x1200 panel at
+	// 125%), so r_mode -2 ("desktop resolution") would render below native.
+	// permonitorv2 makes SDL_GetDesktopDisplayMode / the window use true pixels.
+	SDL_SetHint( SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2" );
+
 	if ( !SDL_WasInit( SDL_INIT_VIDEO ) ) {
 		if ( SDL_InitSubSystem( SDL_INIT_VIDEO ) < 0 ) {
 			ri.Error( ERR_VID_FATAL, "GLimp_Init() - SDL_InitSubSystem(VIDEO) failed: %s\n", SDL_GetError() );

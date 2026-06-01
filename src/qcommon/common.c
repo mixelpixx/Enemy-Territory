@@ -2500,6 +2500,12 @@ void Com_SetRecommended() {
 		}
 	}
 
+	// RM: the stock quality presets above hardcode a 2003-era resolution
+	// (preset_normal.cfg -> "seta r_mode 4" = 800x600). Queue this AFTER the
+	// preset exec so the remaster's native-desktop default (r_mode -2) wins on
+	// first run, while the preset's other quality settings are preserved.
+	Cbuf_AddText( "seta r_mode -2\n" );
+
 
 	/*goodCPU = Sys_GetHighQualityCPU();
 

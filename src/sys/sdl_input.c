@@ -330,10 +330,12 @@ static void IN_ProcessEvents( void ) {
 			break;
 
 		case SDL_MOUSEMOTION:
-			if ( mouseActive ) {
-				dx += e.motion.xrel;
-				dy += e.motion.yrel;
-			}
+			// Feed motion deltas in BOTH states: grabbed (in-game raw look)
+			// AND ungrabbed (menu/console cursor). SDL delivers xrel/yrel in
+			// either mode; the UI moves its own drawn cursor from these SE_MOUSE
+			// deltas, so gating on mouseActive left menus with a dead mouse.
+			dx += e.motion.xrel;
+			dy += e.motion.yrel;
 			break;
 
 		case SDL_MOUSEBUTTONDOWN:
@@ -443,6 +445,10 @@ void IN_Init( void ) {
 
 	// deliver SE_CHAR via SDL_TEXTINPUT
 	SDL_StartTextInput();
+
+	// ET draws its own cursor in menus; hide the OS cursor so we don't show
+	// two. (In relative/grabbed mode SDL hides it anyway; this covers menus.)
+	SDL_ShowCursor( SDL_DISABLE );
 
 	oldButtonState = 0;
 	mouseActive    = qfalse;
