@@ -98,6 +98,7 @@ include(Client)             # etrm (native Win32 client; SDL2 swap follows)
 include(GameModule)         # qagame_mp_x86_64.dll (native 64-bit server game module)
 include(ClientModules)      # cgame_mp_x86_64.dll + ui_mp_x86_64.dll
 include(FeelHarness)        # etrm_feeltest — pmove determinism (Phase 3)
+include(RmAssets)           # zz_rm_ui.pk3 — RM UI override assets (build/bin/etmain)
 
 # ----------------------------------------------------------------------------
 #  Remaining engine targets — added in subsequent Phase 1 commits.
