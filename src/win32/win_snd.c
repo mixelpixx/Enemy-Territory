@@ -31,6 +31,22 @@ If you have questions concerning this license or the applicable additional terms
 #include "../client/snd_local.h"
 #include "win_local.h"
 
+// SDL owns the window now (g_wv.hWnd is NULL), so DirectSound's cooperative
+// level must source the HWND from the SDL window. win_local.h already pulled in
+// windows.h, so the Windows types SDL_syswm.h needs are visible below.
+#include <SDL.h>
+#include <SDL_syswm.h>
+#include "../sys/sdl_local.h"   // Sys_GetSDLWindow
+
+static HWND SND_GetHWND( void ) {
+	SDL_SysWMinfo info;
+	SDL_Window *win = Sys_GetSDLWindow();
+	SDL_VERSION( &info.version );
+	if ( win && SDL_GetWindowWMInfo( win, &info ) )
+		return info.info.win.window;
+	return GetDesktopWindow();   // safe fallback
+}
+
 HRESULT ( WINAPI * pDirectSoundCreate )( GUID FAR *lpGUID, LPDIRECTSOUND FAR *lplpDS, IUnknown FAR *pUnkOuter );
 #define iDirectSoundCreate( a,b,c )   pDirectSoundCreate( a,b,c )
 
@@ -73,7 +89,7 @@ void SNDDMA_Shutdown( void ) {
 		Com_DPrintf( "Destroying DS buffers\n" );
 		if ( pDS ) {
 			Com_DPrintf( "...setting DSSCL_PRIORITY coop level\n" );
-			pDS->lpVtbl->SetCooperativeLevel( pDS, g_wv.hWnd, DSSCL_PRIORITY );
+			pDS->lpVtbl->SetCooperativeLevel( pDS, SND_GetHWND(), DSSCL_PRIORITY );
 		}
 
 		if ( pDSBuf ) {
@@ -178,7 +194,7 @@ int SNDDMA_InitDS() {
 
 	Com_DPrintf( "...setting DSSCL_PRIORITY coop level: " );
 
-	if ( DS_OK != pDS->lpVtbl->SetCooperativeLevel( pDS, g_wv.hWnd, DSSCL_PRIORITY ) ) {
+	if ( DS_OK != pDS->lpVtbl->SetCooperativeLevel( pDS, SND_GetHWND(), DSSCL_PRIORITY ) ) {
 		Com_Printf( "failed\n" );
 		SNDDMA_Shutdown();
 		return qfalse;
@@ -383,7 +399,7 @@ void SNDDMA_Activate( void ) {
 		return;
 	}
 
-	if ( DS_OK != pDS->lpVtbl->SetCooperativeLevel( pDS, g_wv.hWnd, DSSCL_PRIORITY ) ) {
+	if ( DS_OK != pDS->lpVtbl->SetCooperativeLevel( pDS, SND_GetHWND(), DSSCL_PRIORITY ) ) {
 		Com_Printf( "sound SetCooperativeLevel failed\n" );
 		SNDDMA_Shutdown();
 	}
