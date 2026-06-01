@@ -286,14 +286,37 @@ void GLimp_Init( void ) {
 	}
 
 	//
-	// resolution: R_GetModeInfo handles r_mode == -1 (custom) and the table.
+	// resolution:
+	//   r_mode == -2  -> use desktop display resolution (ioquake3 convention)
+	//   r_mode == -1  -> custom (r_customwidth/height, via R_GetModeInfo)
+	//   r_mode >=  0  -> the vidmode table (via R_GetModeInfo)
+	// SDL VIDEO is initialized above, so SDL_GetDesktopDisplayMode is valid here.
 	//
-	if ( !R_GetModeInfo( &width, &height, &windowAspect, r_mode->integer ) ) {
-		ri.Printf( PRINT_ALL, "...invalid mode %d, falling back to mode 4\n", r_mode->integer );
-		if ( !R_GetModeInfo( &width, &height, &windowAspect, 4 ) ) {
-			width = 800;
-			height = 600;
+	{
+		SDL_DisplayMode desktop;
+		qboolean haveDesktop = ( SDL_GetDesktopDisplayMode( 0, &desktop ) == 0 ) ? qtrue : qfalse;
+
+		if ( !haveDesktop ) {
+			Com_RMTrace( "GLimp_Init: SDL_GetDesktopDisplayMode failed: %s", SDL_GetError() );
+			// safe fallback if the desktop query is unavailable
+			desktop.w = 800;
+			desktop.h = 600;
 		}
+
+		if ( r_mode->integer == -2 ) {
+			width  = desktop.w;
+			height = desktop.h;
+			windowAspect = ( height != 0 ) ? ( (float)width / (float)height ) : 0.0f;
+		} else if ( !R_GetModeInfo( &width, &height, &windowAspect, r_mode->integer ) ) {
+			ri.Printf( PRINT_ALL, "...invalid mode %d, falling back to desktop resolution\n", r_mode->integer );
+			width  = desktop.w;
+			height = desktop.h;
+			windowAspect = ( height != 0 ) ? ( (float)width / (float)height ) : 0.0f;
+		}
+
+		Com_RMTrace( "GLimp_Init: desktop=%dx%d, r_mode=%d -> selected %dx%d (%s)",
+					 desktop.w, desktop.h, r_mode->integer, width, height,
+					 r_fullscreen->integer ? "FS" : "W" );
 	}
 
 	ri.Printf( PRINT_ALL, "...setting mode %d: %d %d %s\n", r_mode->integer, width, height,
