@@ -256,6 +256,7 @@ the legacy win_wndproc.c contract).
 */
 void IN_Activate( qboolean active ) {
 	in_appactive = active;
+	Sys_SndPause( !active );    // mute when the window loses focus
 	if ( !active ) {
 		IN_DeactivateMouse();
 	}

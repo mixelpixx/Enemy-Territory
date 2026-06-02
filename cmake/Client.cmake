@@ -24,12 +24,12 @@ set(CLIENT_PLATFORM_SOURCES
     ${ETRM_SRC}/win32/win_wndproc.c
     ${ETRM_SRC}/win32/win_syscon.c
     # client-only native I/O
-    ${ETRM_SRC}/win32/win_snd.c      # DirectSound
-    # SDL2 video + input platform layer — replaces win_glimp/win_qgl/win_gamma
+    # SDL2 video + input + audio platform layer — replaces win_glimp/win_qgl/win_gamma
     # and win_input (DirectInput); Task B (video) + Task C (input/raw mouse)
     ${ETRM_SRC}/sys/sdl_glimp.c      # SDL2 window + GL context
     ${ETRM_SRC}/sys/sdl_qgl.c        # GL proc table via SDL_GL_GetProcAddress
     ${ETRM_SRC}/sys/sdl_input.c      # SDL2 keyboard + mouse (raw relative mouse)
+    ${ETRM_SRC}/sys/sdl_snd.c        # SDL2 audio (replaces win_snd.c DirectSound)
     ${ETRM_SRC}/qcommon/dl_main_stubs.c)
 
 add_executable(etrm
@@ -51,7 +51,7 @@ target_link_libraries(etrm PRIVATE
     etrm_splines
     SDL2::SDL2
     opengl32 gdi32 user32 winmm wsock32 ws2_32 iphlpapi
-    ole32 advapi32 dsound comctl32)
+    ole32 advapi32 comctl32)
 
 # ET has its own WinMain (win_main.c, WIN32_EXECUTABLE). Tell SDL not to
 # define/hook main — do NOT link SDL2main, or WinMain would conflict. We call

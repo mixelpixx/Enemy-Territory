@@ -384,6 +384,11 @@ void GLimp_Init( void ) {
 	// vsync
 	SDL_GL_SetSwapInterval( r_swapInterval ? r_swapInterval->integer : 0 );
 
+	// ET draws its own cursor in menus; hide the OS cursor. Done here (not only
+	// in IN_Init) so a vid_restart — which re-runs GLimp_Init but not IN_Init,
+	// and whose GLimp_Shutdown re-enabled the cursor — keeps it hidden.
+	SDL_ShowCursor( SDL_DISABLE );
+
 	{ Com_RMTrace( "GLimp_Init: QGL_Init (load GL via SDL)..." ); }
 
 	// load GL function pointers via SDL_GL_GetProcAddress
@@ -507,6 +512,20 @@ void GLimp_EndFrame( void ) {
 */
 void GLimp_Shutdown( void ) {
 	ri.Printf( PRINT_ALL, "Shutting down OpenGL subsystem (SDL2)\n" );
+
+	// Release mouse capture / relative-grab and restore the OS cursor WHILE the
+	// window still exists. On quit, GLimp_Shutdown runs before IN_Shutdown, so
+	// releasing here prevents a stale Windows ClipCursor from confining the
+	// desktop cursor after the game exits. IN_DeactivateMouse keeps sdl_input's
+	// grab state in sync, so mouselook re-engages cleanly after a vid_restart.
+	{
+		extern void IN_DeactivateMouse( void );
+		IN_DeactivateMouse();
+	}
+	if ( s_window ) {
+		SDL_SetWindowGrab( s_window, SDL_FALSE );
+	}
+	SDL_ShowCursor( SDL_ENABLE );
 
 	// shutdown the QGL proc table
 	QGL_Shutdown();
