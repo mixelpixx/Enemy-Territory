@@ -43,4 +43,8 @@ If you have questions concerning this license or the applicable additional terms
 // (Task C4) to obtain a native HWND via SDL_GetWindowWMInfo.
 SDL_Window *Sys_GetSDLWindow( void );
 
+// Pause/unpause the SDL audio device (focus muting). Defined in sdl_snd.c,
+// called from sdl_input.c's IN_Activate.
+void Sys_SndPause( qboolean pause );
+
 #endif // __SDL_LOCAL_H__
