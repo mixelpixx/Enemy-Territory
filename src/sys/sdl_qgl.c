@@ -2844,50 +2844,6 @@ void QGL_Shutdown( void ) {
 	qwglSwapBuffers              = NULL;
 }
 
-#define GR_NUM_BOARDS 0x0f
-
-qboolean GlideIsValid( void ) {
-	HMODULE hGlide;
-//	int numBoards;
-//	void (__stdcall *grGet)(unsigned int, unsigned int, int*);
-
-	if ( ( hGlide = LoadLibrary( "Glide3X" ) ) != 0 ) {
-		FreeLibrary( hGlide );
-		// FIXME: 3Dfx needs to fix this shit
-		return qtrue;
-	}
-
-	if ( ( hGlide = LoadLibrary( "Glide2X" ) ) != 0 ) {
-		FreeLibrary( hGlide );
-		// FIXME: 3Dfx needs to fix this shit
-		return qtrue;
-	}
-#if 0
-	grGet = (void *)GetProcAddress( hGlide, "_grGet@12" );
-
-	if ( grGet ) {
-		grGet( GR_NUM_BOARDS, sizeof( int ), &numBoards );
-	} else
-	{
-		// if we've reached this point, something is seriously wrong
-		ri.Printf( PRINT_WARNING, "WARNING: could not find grGet in GLIDE3X.DLL\n" );
-		numBoards = 0;
-	}
-
-	FreeLibrary( hGlide );
-	hGlide = NULL;
-
-	if ( numBoards > 0 ) {
-		return qtrue;
-	}
-
-	ri.Printf( PRINT_WARNING, "WARNING: invalid Glide installation!\n" );
-}
-#endif
-
-	return qfalse;
-}
-
 #ifndef __GNUC__
 #   pragma warning (disable : 4113 4133 4047 )
 #endif
