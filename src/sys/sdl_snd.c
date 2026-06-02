@@ -33,6 +33,7 @@ static int             dmapos     = 0;        // play cursor, in (channel-)sampl
 static int             dmasize    = 0;        // ring size in BYTES
 static qboolean        snd_inited = qfalse;
 static SDL_AudioDeviceID sdlAudioDevice = 0;  // opened device (0 = none)
+static qboolean        ownAudioSubsystem = qfalse;
 
 cvar_t *s_sdlSamples;                   // device callback buffer (0 = auto)
 
@@ -80,6 +81,8 @@ static void SNDDMA_AudioCallback( void *userdata, Uint8 *stream, int len ) {
 
 static int SND_RoundUpPow2( int v ) {
 	int p = 1;
+	if ( v < 1 ) return 1;
+	if ( v > 0x40000000 ) v = 0x40000000;
 	while ( p < v ) {
 		p <<= 1;
 	}
@@ -108,6 +111,7 @@ qboolean SNDDMA_Init( void ) {
 			Com_Printf( "SDL_InitSubSystem(AUDIO) failed: %s\n", SDL_GetError() );
 			return qfalse;
 		}
+		ownAudioSubsystem = qtrue;
 	}
 
 	// desired format from the existing ET cvars
@@ -145,8 +149,8 @@ qboolean SNDDMA_Init( void ) {
 	sdlAudioDevice = SDL_OpenAudioDevice( NULL, SDL_FALSE, &desired, &obtained,
 		SDL_AUDIO_ALLOW_FREQUENCY_CHANGE | SDL_AUDIO_ALLOW_CHANNELS_CHANGE );
 	if ( sdlAudioDevice == 0 ) {
-		Com_Printf( "SDL_OpenAudio failed: %s\n", SDL_GetError() );
-		SDL_QuitSubSystem( SDL_INIT_AUDIO );
+		Com_Printf( "SDL_OpenAudioDevice failed: %s\n", SDL_GetError() );
+		if ( ownAudioSubsystem ) { SDL_QuitSubSystem( SDL_INIT_AUDIO ); ownAudioSubsystem = qfalse; }
 		return qfalse;
 	}
 
@@ -167,6 +171,14 @@ qboolean SNDDMA_Init( void ) {
 	dmasize     = dma.samples * ( dma.samplebits / 8 );
 	dma.buffer  = (byte *)calloc( 1, dmasize );
 	dmapos      = 0;
+
+	if ( !dma.buffer ) {
+		Com_Printf( "SDL audio: out of memory allocating %d-byte ring\n", dmasize );
+		SDL_CloseAudioDevice( sdlAudioDevice );
+		sdlAudioDevice = 0;
+		if ( ownAudioSubsystem ) { SDL_QuitSubSystem( SDL_INIT_AUDIO ); ownAudioSubsystem = qfalse; }
+		return qfalse;
+	}
 
 	Com_Printf( "SDL audio: %d Hz %d-bit %dch; dev buffer %d samples; ring %d samples\n",
 				dma.speed, dma.samplebits, dma.channels, obtained.samples, dma.samples );
@@ -194,16 +206,17 @@ void SNDDMA_Shutdown( void ) {
 	if ( !snd_inited ) {
 		return;
 	}
+	snd_inited = qfalse;                          // stop the callback touching the ring first
 	SDL_PauseAudioDevice( sdlAudioDevice, 1 );
-	SDL_CloseAudioDevice( sdlAudioDevice );
+	SDL_CloseAudioDevice( sdlAudioDevice );       // joins the audio thread
 	sdlAudioDevice = 0;
-	SDL_QuitSubSystem( SDL_INIT_AUDIO );
-	if ( dma.buffer ) {
-		free( dma.buffer );
+	if ( ownAudioSubsystem ) {
+		SDL_QuitSubSystem( SDL_INIT_AUDIO );
+		ownAudioSubsystem = qfalse;
 	}
+	free( dma.buffer );
 	memset( (void *)&dma, 0, sizeof( dma ) );
 	dmapos = dmasize = 0;
-	snd_inited = qfalse;
 }
 
 /*
