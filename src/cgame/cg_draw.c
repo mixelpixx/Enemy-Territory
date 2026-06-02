@@ -1641,6 +1641,33 @@ void CG_FinishWeaponChange( int lastweap, int newweap ); // JPW NERVE
 CG_DrawCrosshair
 =================
 */
+/*
+=================
+CG_ScaleCrosshair
+
+Scale a crosshair/reticle element that centers ITSELF on the 3D viewport (the
+caller adds 0.5*(cg.refdef_current->width - w)). Unlike CG_AdjustFrom640 this
+applies NO pillarbox horizontal translation — adding that translation on top of
+the refdef self-centering is what pushed the crosshair off-centre. Uses a
+uniform scale when cg_fixedAspect is on so the crosshair stays round on
+widescreen; otherwise matches the vanilla anamorphic screen scale.
+=================
+*/
+static void CG_ScaleCrosshair( float *x, float *y, float *w, float *h ) {
+	float sw, sh;
+
+	if ( cg_fixedAspect.integer && cgs.glconfig.vidWidth * 480 > cgs.glconfig.vidHeight * 640 ) {
+		sw = sh = cgs.glconfig.vidHeight / 480.0f;
+	} else {
+		sw = cgs.screenXScale;
+		sh = cgs.screenYScale;
+	}
+	*x *= sw;
+	*y *= sh;
+	*w *= sw;
+	*h *= sh;
+}
+
 static void CG_DrawCrosshair( void ) {
 	float w, h;
 	qhandle_t hShader;
@@ -1752,7 +1779,7 @@ static void CG_DrawCrosshair( void ) {
 
 	x = cg_crosshairX.integer;
 	y = cg_crosshairY.integer;
-	CG_AdjustFrom640( &x, &y, &w, &h );
+	CG_ScaleCrosshair( &x, &y, &w, &h );
 
 	hShader = cgs.media.crosshairShader[ cg_drawCrosshair.integer % NUM_CROSSHAIRS ];
 
@@ -1762,7 +1789,7 @@ static void CG_DrawCrosshair( void ) {
 		w = h = cg_crosshairSize.value;
 		x = cg_crosshairX.integer;
 		y = cg_crosshairY.integer;
-		CG_AdjustFrom640( &x, &y, &w, &h );
+		CG_ScaleCrosshair( &x, &y, &w, &h );
 
 		if ( cg_crosshairHealth.integer == 0 ) {
 			trap_R_SetColor( cg.xhairColorAlt );
@@ -1798,7 +1825,7 @@ static void CG_DrawNoShootIcon( void ) {
 
 	x = cg_crosshairX.integer + 1;
 	y = cg_crosshairY.integer + 1;
-	CG_AdjustFrom640( &x, &y, &w, &h );
+	CG_ScaleCrosshair( &x, &y, &w, &h );
 
 	// FIXME precache
 	trap_R_DrawStretchPic( x + 0.5 * ( cg.refdef_current->width - w ), y + 0.5 * ( cg.refdef_current->height - h ), w, h, 0, 0, 1, 1, cgs.media.friendShader );
