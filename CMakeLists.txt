@@ -58,18 +58,21 @@ include(CompilerWarnings)
 set(ETRM_SRC "${CMAKE_SOURCE_DIR}/src")
 
 # ----------------------------------------------------------------------------
-#  SDL2 — optional for now. The Windows client currently uses the native Win32
-#  platform layer; SDL2 is intended for the planned cross-platform layer
-#  (video/input/sound on Linux/macOS). It is detected if present (set SDL2_DIR
-#  to a directory containing sdl2-config.cmake) but is NOT required to build.
+#  SDL2 — fetched and built from a pinned release tag (reproducible, no system
+#  install). Provides the SDL2::SDL2 import target used by the src/sys layer.
 # ----------------------------------------------------------------------------
 if(BUILD_CLIENT)
-    find_package(SDL2 QUIET)
-    if(SDL2_FOUND)
-        message(STATUS "ET-RM: SDL2 ${SDL2_VERSION} found (available for the future platform layer)")
-    else()
-        message(STATUS "ET-RM: SDL2 not found (not required yet; native Win32 layer in use)")
-    endif()
+    include(FetchContent)
+    set(SDL_TEST OFF CACHE BOOL "" FORCE)
+    set(SDL_SHARED ON  CACHE BOOL "" FORCE)
+    set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(
+        SDL2
+        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+        GIT_TAG        release-2.30.9   # pinned; bump deliberately
+        GIT_SHALLOW    TRUE)
+    message(STATUS "ET-RM: fetching SDL2 (release-2.30.9) ...")
+    FetchContent_MakeAvailable(SDL2)
 endif()
 
 # ----------------------------------------------------------------------------
@@ -95,6 +98,7 @@ include(Client)             # etrm (native Win32 client; SDL2 swap follows)
 include(GameModule)         # qagame_mp_x86_64.dll (native 64-bit server game module)
 include(ClientModules)      # cgame_mp_x86_64.dll + ui_mp_x86_64.dll
 include(FeelHarness)        # etrm_feeltest — pmove determinism (Phase 3)
+include(RmAssets)           # zz_rm_ui.pk3 — RM UI override assets (build/bin/etmain)
 
 # ----------------------------------------------------------------------------
 #  Remaining engine targets — added in subsequent Phase 1 commits.

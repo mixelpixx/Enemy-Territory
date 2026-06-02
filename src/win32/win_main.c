@@ -1017,7 +1017,6 @@ Sys_GetEvent
 ================
 */
 sysEvent_t Sys_GetEvent( void ) {
-	MSG msg;
 	sysEvent_t ev;
 	char        *s;
 	msg_t netmsg;
@@ -1029,18 +1028,14 @@ sysEvent_t Sys_GetEvent( void ) {
 		return eventQue[ ( eventTail - 1 ) & MASK_QUED_EVENTS ];
 	}
 
-	// pump the message loop
-	while ( PeekMessage( &msg, NULL, 0, 0, PM_NOREMOVE ) ) {
-		if ( !GetMessage( &msg, NULL, 0, 0 ) ) {
-			Com_Quit_f();
-		}
-
-		// save the msg time, because wndprocs don't have access to the timestamp
-		g_wv.sysMsgTime = msg.time;
-
-		TranslateMessage( &msg );
-		DispatchMessage( &msg );
-	}
+	// Pump the SDL event queue. SDL2 (sdl_glimp.c) owns the window now, so the
+	// old Win32 PeekMessage/GetMessage/DispatchMessage loop that drove the
+	// retired Win32 GL window is gone — pumping it here would steal SDL's
+	// window messages before SDL_PollEvent sees them. IN_Frame() (sdl_input.c)
+	// drains SDL_PollEvent and queues SE_KEY/SE_CHAR/SE_MOUSE via Sys_QueEvent.
+	// This is the single input pump for the build; the main loop in WinMain no
+	// longer calls IN_Frame directly (avoids double-pumping).
+	IN_Frame();
 
 	// check for console commands
 	s = Sys_ConsoleInput();
@@ -1310,8 +1305,9 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 
 		startTime = Sys_Milliseconds();
 
-		// make sure mouse and joystick are only called once a frame
-		IN_Frame();
+		// NOTE: input is pumped via Sys_GetEvent()->IN_Frame() (SDL) during
+		// Com_Frame's event loop. We no longer call IN_Frame() here, which
+		// would double-pump the SDL event queue and re-toggle the mouse grab.
 
 //		Com_FrameExt();
 		Com_Frame();

@@ -19,5 +19,7 @@ if not exist "%BIN%\etrm.exe" (
 )
 
 cd /d "%BIN%"
-"%BIN%\etrm.exe" +set fs_basepath "%ET_BASEPATH%" +set fs_homepath "%BIN%" +set sv_pure 0 +set r_fullscreen 0 %*
+rem Boots borderless-fullscreen at native desktop resolution by default
+rem (r_mode -2, r_fullscreen 1). For a window, pass:  play.bat +set r_fullscreen 0
+"%BIN%\etrm.exe" +set fs_basepath "%ET_BASEPATH%" +set fs_homepath "%BIN%" +set sv_pure 0 %*
 endlocal

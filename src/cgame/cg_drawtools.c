@@ -55,10 +55,21 @@ void CG_AdjustFrom640( float *x, float *y, float *w, float *h ) {
 	}*/
 
 	// scale for screen sizes
-	*x *= cgs.screenXScale;
-	*y *= cgs.screenYScale;
-	*w *= cgs.screenXScale;
-	*h *= cgs.screenYScale;
+	if ( cg_fixedAspect.integer && cgs.glconfig.vidWidth * 480 > cgs.glconfig.vidHeight * 640 ) {
+		// widescreen: uniform scale by the vertical factor, center horizontally (pillarbox)
+		float yscale = cgs.glconfig.vidHeight / 480.0f;
+		float wide   = cgs.glconfig.vidWidth - ( cgs.glconfig.vidHeight * 640.0f / 480.0f );
+		*x = ( *x * yscale ) + ( wide * 0.5f );
+		*y =   *y * yscale;
+		*w =   *w * yscale;
+		*h =   *h * yscale;
+	} else {
+		// original behavior (4:3, taller-than-wide, or correction disabled)
+		*x *= cgs.screenXScale;
+		*y *= cgs.screenYScale;
+		*w *= cgs.screenXScale;
+		*h *= cgs.screenYScale;
+	}
 }
 
 /*

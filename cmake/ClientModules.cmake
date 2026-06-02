@@ -18,7 +18,8 @@ file(GLOB CGAME_OWN_SOURCES "${CG_DIR}/*.c")
 list(REMOVE_ITEM CGAME_OWN_SOURCES "${CG_DIR}/cg_panelhandling.c")
 set(CGAME_SHARED_SOURCES
     ${GM_DIR}/bg_animation.c ${GM_DIR}/bg_animgroup.c ${GM_DIR}/bg_character.c
-    ${GM_DIR}/bg_classes.c   ${GM_DIR}/bg_misc.c      ${GM_DIR}/bg_pmove.c
+    ${GM_DIR}/bg_classes.c   ${GM_DIR}/bg_fov.c       ${GM_DIR}/bg_misc.c
+    ${GM_DIR}/bg_pmove.c
     ${GM_DIR}/bg_slidemove.c ${GM_DIR}/bg_sscript.c   ${GM_DIR}/bg_stats.c
     ${GM_DIR}/bg_tracemap.c  ${GM_DIR}/q_math.c       ${GM_DIR}/q_shared.c
     ${UI_DIR}/ui_shared.c)

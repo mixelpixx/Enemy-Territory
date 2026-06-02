@@ -1639,6 +1639,11 @@ void    BG_EvaluateTrajectory( const trajectory_t *tr, int atTime, vec3_t result
 void BG_EvaluateTrajectoryDelta( const trajectory_t *tr, int atTime, vec3_t result, qboolean isAngle, int splineData );
 void    BG_GetMarkDir( const vec3_t dir, const vec3_t normal, vec3_t out );
 
+// RM: hor+ widescreen FOV helper. Treats fov43ref as the 4:3-reference
+// horizontal fov, anchors the vertical fov to 4:3, and widens the horizontal
+// fov for the actual aspect ratio. Pure math; presentation only.
+void BG_CalcFovHorPlus( float fov43ref, int width, int height, float *fov_x, float *fov_y );
+
 void    BG_AddPredictableEventToPlayerstate( int newEvent, int eventParm, playerState_t *ps );
 
 //void	BG_TouchJumpPad( playerState_t *ps, entityState_t *jumppad );

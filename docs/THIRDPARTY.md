@@ -39,7 +39,13 @@ which RM files, and the license consequence.
 
 | Date | RM file(s) | Ported from | Source license | Verbatim / adapted / reference | Notes |
 |------|-----------|-------------|----------------|--------------------------------|-------|
-| _(none yet)_ | | | | | |
+| 2026-06-01 | src/sys/sdl_glimp.c | ioquake3 code/sdl/sdl_glimp.c | GPL-2.0-or-later | adapted | SDL2 window + GL context; adapted to ET GLimp_* interface (replaces win_glimp.c) |
+| 2026-06-01 | src/sys/sdl_input.c | ioquake3 code/sdl/sdl_input.c | GPL-2.0-or-later | adapted | SDL2 input + raw relative mouse; ET keymap + Sys_QueEvent contract (replaces win_input.c/DirectInput) |
+| 2026-06-01 | src/sys/sdl_qgl.c | id win_qgl.c (GPLv3 base) + SDL loader | GPLv3 | adapted | qgl proc table sourced via SDL_GL_GetProcAddress (replaces win_qgl.c WGL loader) |
+| 2026-06-01 | src/game/bg_fov.c | original (hor+ formula; technique ref ET:Legacy/ioquake3) | GPLv3 | original | hor+ widescreen FOV math; clean-room from the standard square-pixel formula |
+
+**SDL2** is now fetched via CMake `FetchContent` (pinned to release-2.30.9) as the
+platform layer for window/GL context/input — its **zlib** license is GPLv3-compatible.
 
 ## Bundled libraries (Phase 4 will modernize)
 
