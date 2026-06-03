@@ -264,7 +264,12 @@ void GLimp_SetGamma( unsigned char red[256], unsigned char green[256], unsigned 
 ** desktop-mode query above); deduped; sorted descending by area.
 */
 static void GLimp_PublishAvailableModes( void ) {
-	char	buf[1024];
+	// Sized to the cvar value limit, NOT bigger: r_availableModes is read by the
+	// UI VM, and Cvar_Update ERR_DROPs a vmCvar whose string exceeds
+	// MAX_CVAR_VALUE_STRING. The append loop caps against sizeof(buf)-1, so this
+	// also bounds the published value to the contract (truncating extra modes on
+	// rare many-resolution displays rather than crashing the client).
+	char	buf[MAX_CVAR_VALUE_STRING];
 	int		nmodes, i, n;
 	struct { int w, h; } list[96];
 	int		count = 0;
