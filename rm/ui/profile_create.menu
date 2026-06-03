@@ -174,7 +174,7 @@ menuDef {
 																																		( "setcvar ui_profile_create_error \\\"Can't create profile. Please enter a valid player alias.\\\" ; open profile_create_error ; abort" )
 																																	 conditionalscript ui_rate 0
 																																		( "clearFocus" )
-																																		( "setcvar ui_profile_create_error \\\"Can't create profile. Please select your connection type. If you are unsure what to select, choose Modem.\\\" ; open profile_create_error ; abort" )
+																																		( "setcvar ui_profile_create_error \\\"Can't create profile. Please select your connection type. If unsure, choose Broadband.\\\" ; open profile_create_error ; abort" )
 																																	 conditionalscript UIProfileAlreadyExists 2
 																																		( "setcvar ui_profile_create_error \\\"Can't create profile. A profile with the same name already exists.\\\" ; open profile_create_error ; abort" )
 																																		( "clearFocus" )
