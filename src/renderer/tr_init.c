@@ -964,6 +964,7 @@ void R_Register( void ) {
 	r_fullscreen = ri.Cvar_Get( "r_fullscreen", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	r_customwidth = ri.Cvar_Get( "r_customwidth", "1600", CVAR_ARCHIVE | CVAR_LATCH );
 	r_customheight = ri.Cvar_Get( "r_customheight", "1024", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_Get( "r_availableModes", "", CVAR_ROM );        // RM: SDL-detected display modes for the UI resolution picker
 	r_customaspect = ri.Cvar_Get( "r_customaspect", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	r_simpleMipMaps = ri.Cvar_Get( "r_simpleMipMaps", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	r_uiFullScreen = ri.Cvar_Get( "r_uifullscreen", "0", 0 );

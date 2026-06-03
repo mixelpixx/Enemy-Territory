@@ -258,6 +258,61 @@ void GLimp_SetGamma( unsigned char red[256], unsigned char green[256], unsigned 
 }
 
 /*
+** Build a space-delimited "WxH" list of the display's unique modes and publish
+** it as r_availableModes for the UI resolution picker. Detected dynamically so
+** the picker reflects what THIS monitor supports. Display 0 (matches the
+** desktop-mode query above); deduped; sorted descending by area.
+*/
+static void GLimp_PublishAvailableModes( void ) {
+	char	buf[1024];
+	int		nmodes, i, n;
+	struct { int w, h; } list[96];
+	int		count = 0;
+
+	nmodes = SDL_GetNumDisplayModes( 0 );
+	for ( i = 0; i < nmodes && count < (int)( sizeof( list ) / sizeof( list[0] ) ); i++ ) {
+		SDL_DisplayMode m;
+		int j, dup = 0;
+		if ( SDL_GetDisplayMode( 0, i, &m ) != 0 ) {
+			continue;
+		}
+		if ( m.w < 640 || m.h < 480 ) {        // skip ancient tiny modes
+			continue;
+		}
+		for ( j = 0; j < count; j++ ) {
+			if ( list[j].w == m.w && list[j].h == m.h ) { dup = 1; break; }
+		}
+		if ( !dup ) {
+			list[count].w = m.w;
+			list[count].h = m.h;
+			count++;
+		}
+	}
+	// insertion-sort descending by pixel area (SDL lists largest-first already,
+	// but don't rely on it)
+	for ( i = 1; i < count; i++ ) {
+		int kw = list[i].w, kh = list[i].h, j = i - 1;
+		while ( j >= 0 && ( list[j].w * list[j].h ) < ( kw * kh ) ) {
+			list[j + 1] = list[j];
+			j--;
+		}
+		list[j + 1].w = kw; list[j + 1].h = kh;
+	}
+	buf[0] = '\0';
+	for ( i = 0, n = 0; i < count; i++ ) {
+		char entry[32];
+		Com_sprintf( entry, sizeof( entry ), "%s%dx%d", ( n ? " " : "" ), list[i].w, list[i].h );
+		if ( strlen( buf ) + strlen( entry ) >= sizeof( buf ) - 1 ) {
+			break;                              // cap to cvar buffer
+		}
+		Q_strcat( buf, sizeof( buf ), entry );
+		n++;
+	}
+	ri.Cvar_Set( "r_availableModes", buf );
+	Com_RMTrace( "GLimp: r_availableModes (%d modes) = %s", n, buf );
+}
+
+/*
 ** GLimp_Init
 **
 ** Creates the SDL window + GL context, loads GL via QGL_Init(SDL), and fills
@@ -325,6 +380,10 @@ void GLimp_Init( void ) {
 					 desktop.w, desktop.h, r_mode->integer, width, height,
 					 r_fullscreen->integer ? "FS" : "W" );
 	}
+
+	// SDL video is inited above; publish the display's supported modes for the
+	// UI resolution picker (r_availableModes).
+	GLimp_PublishAvailableModes();
 
 	ri.Printf( PRINT_ALL, "...setting mode %d: %d %d %s\n", r_mode->integer, width, height,
 			   r_fullscreen->integer ? "FS" : "W" );
