@@ -922,6 +922,10 @@ typedef struct {
 	const char  *glInfoLines[GLINFO_LINES];
 	int numGlInfoLines;
 
+#define UI_MAX_RESOLUTIONS 96
+	int  resolutionCount;
+	char resolutionList[UI_MAX_RESOLUTIONS][20];   // "WxH" strings
+
 	vec4_t xhairColor;
 	vec4_t xhairColorAlt;
 
