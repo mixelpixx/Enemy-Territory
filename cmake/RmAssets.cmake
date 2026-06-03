@@ -24,7 +24,10 @@ set(RM_PAK           "${RM_PAK_OUT_DIR}/zz_rm_ui.pk3")
 # Entries to store in the pak, as paths relative to rm/ (these become the pak's
 # internal paths). Listing the known files keeps stray files out of the pak.
 set(RM_PAK_ENTRIES
-    ui/options_customise_game.menu)
+    ui/options_customise_game.menu
+    ui/options_system.menu
+    ui/profile_create.menu
+    ui/profile_create_initial.menu)
 
 # DEPENDS list: glob the rm/ source so adding menu files later just works.
 file(GLOB_RECURSE RM_ASSET_SOURCES CONFIGURE_DEPENDS "${RM_ASSET_SRC_DIR}/*")
