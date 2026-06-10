@@ -297,7 +297,7 @@ static void InitOpenGL( void ) {
 	if ( glConfig.vidWidth == 0 ) {
 		GLint temp;
 
-		GLimp_Init();
+		GLimp_Init( NULL );  // RM: NULL = legacy context (renderer1 default)
 
 		strcpy( renderer_buffer, glConfig.renderer_string );
 		Q_strlwr( renderer_buffer );

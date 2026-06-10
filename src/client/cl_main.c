@@ -33,6 +33,15 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "snd_local.h" // fretn
 
+// RM: engine-side glimp (src/sys/sdl_glimp.c) — handed to renderer DLLs via
+// refimport (REF_API_VERSION 9). Declared locally: GLimp_* live in tr_local.h,
+// which the client must not include.
+void GLimp_Init( const glimpParams_t *params );
+void GLimp_Shutdown( void );
+void GLimp_EndFrame( void );
+void GLimp_SetGamma( unsigned char red[256], unsigned char green[256], unsigned char blue[256] );
+void *Sys_GL_GetProcAddress( const char *name );
+
 cvar_t  *cl_wavefilerecord;
 cvar_t  *cl_nodelta;
 cvar_t  *cl_debugMove;
@@ -3216,6 +3225,13 @@ void CL_InitRef( void ) {
 	ri.CIN_UploadCinematic = CIN_UploadCinematic;
 	ri.CIN_PlayCinematic = CIN_PlayCinematic;
 	ri.CIN_RunCinematic = CIN_RunCinematic;
+
+	// RM (REF_API_VERSION 9): platform services for renderer DLLs
+	ri.GLimp_Init = GLimp_Init;
+	ri.GLimp_Shutdown = GLimp_Shutdown;
+	ri.GLimp_EndFrame = GLimp_EndFrame;
+	ri.GLimp_SetGamma = GLimp_SetGamma;
+	ri.GL_GetProcAddress = Sys_GL_GetProcAddress;
 
 	Com_RMTrace( "CL_InitRef: GetRefAPI..." );
 	ret = GetRefAPI( REF_API_VERSION, &ri );

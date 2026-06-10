@@ -1578,7 +1578,7 @@ IMPLEMENTATION SPECIFIC FUNCTIONS
 
 extern int gl_NormalFontBase;
 
-void        GLimp_Init( void );
+void        GLimp_Init( const glimpParams_t *params );
 void        GLimp_Shutdown( void );
 void        GLimp_EndFrame( void );
 

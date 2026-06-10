@@ -318,12 +318,57 @@ static void GLimp_PublishAvailableModes( void ) {
 }
 
 /*
+** GLW_CreateWindowAndContext
+**
+** RM: one attempt at the SDL_CreateWindow -> SDL_GL_CreateContext ->
+** SDL_GL_MakeCurrent sequence, factored out of GLimp_Init so the
+** core-profile fallback ladder can retry it once. On failure returns qfalse
+** with the failing stage name and the SDL error text captured for the caller;
+** any partial s_window/s_context state is left as-is (the caller cleans up
+** before a retry, and the legacy params==NULL path goes straight to ri.Error
+** exactly as before).
+*/
+static qboolean GLW_CreateWindowAndContext( int width, int height, Uint32 flags,
+											const char **failedStage,
+											char *errText, int errTextSize ) {
+	{ Com_RMTrace( "GLimp_Init: SDL_CreateWindow %dx%d flags=0x%x...", width, height, (unsigned)flags ); }
+
+	s_window = SDL_CreateWindow( "Wolfenstein: Enemy Territory",
+								 SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+								 width, height, flags );
+	if ( !s_window ) {
+		*failedStage = "SDL_CreateWindow";
+		Q_strncpyz( errText, SDL_GetError(), errTextSize );
+		return qfalse;
+	}
+
+	{ Com_RMTrace( "GLimp_Init: SDL_GL_CreateContext..." ); }
+
+	s_context = SDL_GL_CreateContext( s_window );
+	if ( !s_context ) {
+		*failedStage = "SDL_GL_CreateContext";
+		Q_strncpyz( errText, SDL_GetError(), errTextSize );
+		return qfalse;
+	}
+
+	if ( SDL_GL_MakeCurrent( s_window, s_context ) < 0 ) {
+		*failedStage = "SDL_GL_MakeCurrent";
+		Q_strncpyz( errText, SDL_GetError(), errTextSize );
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
 ** GLimp_Init
 **
 ** Creates the SDL window + GL context, loads GL via QGL_Init(SDL), and fills
-** glConfig exactly as win_glimp.c did.
+** glConfig exactly as win_glimp.c did. params is an optional GL-context
+** request from the renderer (DLL renderers); NULL = legacy default
+** compatibility context (renderer1's path, identical to pre-v9 behavior).
 */
-void GLimp_Init( void ) {
+void GLimp_Init( const glimpParams_t *params ) {
 	char buf[1024];
 	cvar_t *lastValidRenderer = ri.Cvar_Get( "r_lastValidRenderer", "(uninitialized)", CVAR_ARCHIVE );
 	int width, height;
@@ -411,6 +456,23 @@ void GLimp_Init( void ) {
 		stencilbits = 0;
 	}
 
+	// RM: optional context-profile request from the renderer (DLL renderers).
+	// NULL = legacy default-compatibility context — renderer1's path, identical
+	// to the pre-v9 behavior (no attributes set here at all).
+	if ( params ) {
+		SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, params->majorVersion );
+		SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, params->minorVersion );
+		SDL_GL_SetAttribute( SDL_GL_CONTEXT_PROFILE_MASK,
+							 params->coreProfile ? SDL_GL_CONTEXT_PROFILE_CORE
+												 : SDL_GL_CONTEXT_PROFILE_COMPATIBILITY );
+		if ( params->debugContext ) {
+			SDL_GL_SetAttribute( SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG );
+		}
+		Com_RMTrace( "GLimp_Init: context request %d.%d %s",
+					 params->majorVersion, params->minorVersion,
+					 params->coreProfile ? "core" : "compat" );
+	}
+
 	SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 1 );
 	SDL_GL_SetAttribute( SDL_GL_RED_SIZE, 8 );
 	SDL_GL_SetAttribute( SDL_GL_GREEN_SIZE, 8 );
@@ -425,24 +487,39 @@ void GLimp_Init( void ) {
 		flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
 	}
 
-	{ Com_RMTrace( "GLimp_Init: SDL_CreateWindow %dx%d flags=0x%x...", width, height, (unsigned)flags ); }
+	{
+		const char *failedStage = "";
+		char errText[256];
+		qboolean ok;
 
-	s_window = SDL_CreateWindow( "Wolfenstein: Enemy Territory",
-								 SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-								 width, height, flags );
-	if ( !s_window ) {
-		ri.Error( ERR_VID_FATAL, "GLimp_Init() - SDL_CreateWindow failed: %s\n", SDL_GetError() );
-	}
+		errText[0] = '\0';
+		ok = GLW_CreateWindowAndContext( width, height, flags, &failedStage, errText, sizeof( errText ) );
 
-	{ Com_RMTrace( "GLimp_Init: SDL_GL_CreateContext..." ); }
+		// RM: fallback ladder — if the renderer requested a core profile and it
+		// failed, retry ONCE with a compatibility profile.
+		if ( !ok && params && params->coreProfile ) {
+			ri.Printf( PRINT_ALL, "...core profile context failed (%s: %s), retrying with compatibility profile\n",
+					   failedStage, errText );
+			if ( s_context ) {
+				SDL_GL_DeleteContext( s_context );
+				s_context = NULL;
+			}
+			if ( s_window ) {
+				SDL_DestroyWindow( s_window );
+				s_window = NULL;
+			}
+			SDL_GL_SetAttribute( SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY );
+			ok = GLW_CreateWindowAndContext( width, height, flags, &failedStage, errText, sizeof( errText ) );
+		}
 
-	s_context = SDL_GL_CreateContext( s_window );
-	if ( !s_context ) {
-		ri.Error( ERR_VID_FATAL, "GLimp_Init() - SDL_GL_CreateContext failed: %s\n", SDL_GetError() );
-	}
-
-	if ( SDL_GL_MakeCurrent( s_window, s_context ) < 0 ) {
-		ri.Error( ERR_VID_FATAL, "GLimp_Init() - SDL_GL_MakeCurrent failed: %s\n", SDL_GetError() );
+		if ( !ok ) {
+			if ( params ) {
+				ri.Error( ERR_VID_FATAL, "GLimp_Init() - %s failed: %s (try cl_renderer gl1)\n", failedStage, errText );
+			} else {
+				// legacy (params==NULL) failure path — message identical to pre-v9
+				ri.Error( ERR_VID_FATAL, "GLimp_Init() - %s failed: %s\n", failedStage, errText );
+			}
+		}
 	}
 
 	// vsync
@@ -633,6 +710,18 @@ void GLimp_LogComment( char *comment ) {
 */
 SDL_Window *Sys_GetSDLWindow( void ) {
 	return s_window;
+}
+
+/*
+===============
+Sys_GL_GetProcAddress
+
+GL entry-point resolution for renderer DLLs (refimport GL_GetProcAddress).
+Wraps SDL so renderer DLLs never link SDL themselves.
+===============
+*/
+void *Sys_GL_GetProcAddress( const char *name ) {
+	return SDL_GL_GetProcAddress( name );
 }
 
 /*
