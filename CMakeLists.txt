@@ -99,6 +99,7 @@ include(GameModule)         # qagame_mp_x86_64.dll (native 64-bit server game mo
 include(ClientModules)      # cgame_mp_x86_64.dll + ui_mp_x86_64.dll
 include(FeelHarness)        # etrm_feeltest — pmove determinism (Phase 3)
 include(RmAssets)           # zz_rm_ui.pk3 — RM UI override assets (build/bin/etmain)
+include(Renderer2)          # etrm_renderer2.dll — opt-in renderer DLL (R2-1 stub)
 
 # ----------------------------------------------------------------------------
 #  Remaining engine targets — added in subsequent Phase 1 commits.
