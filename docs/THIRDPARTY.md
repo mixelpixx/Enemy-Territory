@@ -44,6 +44,10 @@ which RM files, and the license consequence.
 | 2026-06-01 | src/sys/sdl_qgl.c | id win_qgl.c (GPLv3 base) + SDL loader | GPLv3 | adapted | qgl proc table sourced via SDL_GL_GetProcAddress (replaces win_qgl.c WGL loader) |
 | 2026-06-01 | src/game/bg_fov.c | original (hor+ formula; technique ref ET:Legacy/ioquake3) | GPLv3 | original | hor+ widescreen FOV math; clean-room from the standard square-pixel formula |
 | 2026-06-01 | src/sys/sdl_snd.c | ioquake3 code/sdl/snd_sdl.c | GPL-2.0-or-later | adapted | SDL2 audio backend (callback + DMA ring); ET SNDDMA_* contract (replaces win_snd.c DirectSound) |
+| 2026-06-10 | src/renderer2/etl/** | ET:Legacy v2.84.0 @ 764ffc00a953e59aaf435272d004c49a89710309 src/renderer2/*.c\|h | GPL-3.0 | verbatim | vendored into src/renderer2/ (etl/, etl/common/, glsl/, header closure) — renderer2 (GLSL, GL 3.3 core) sources |
+| 2026-06-10 | src/renderer2/etl/common/** | ET:Legacy v2.84.0 @ 764ffc00a953e59aaf435272d004c49a89710309 src/renderercommon/* | GPL-3.0 | verbatim | vendored into src/renderer2/ (etl/, etl/common/, glsl/, header closure) — renderercommon (tr_common, image loaders, font); tr_common_vulkan.c/tr_image_svg.c do not exist at this pin |
+| 2026-06-10 | src/renderer2/glsl/**, src/renderer2/gldef/default.gldef | ET:Legacy v2.84.0 @ 764ffc00a953e59aaf435272d004c49a89710309 src/renderer2/glsl/** + gldef/default.gldef | GPL-3.0 | verbatim | vendored into src/renderer2/ (etl/, etl/common/, glsl/, header closure) — GLSL shaders + shdr/ (shaders2h host tool) + default.gldef |
+| 2026-06-10 | src/renderer2/etlhdr/** | ET:Legacy v2.84.0 @ 764ffc00a953e59aaf435272d004c49a89710309 src/qcommon/, src/game/, src/renderercommon/ headers | GPL-3.0 | verbatim | vendored into src/renderer2/ (etl/, etl/common/, glsl/, header closure) — private header closure (10 qcommon + surfaceflags.h + 3 renderercommon duplicates for `../renderercommon/` include shape); headers only, no engine .c |
 
 **SDL2** is now fetched via CMake `FetchContent` (pinned to release-2.30.9) as the
 platform layer for window/GL context/input — its **zlib** license is GPLv3-compatible.
