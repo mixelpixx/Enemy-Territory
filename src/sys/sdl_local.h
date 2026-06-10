@@ -43,6 +43,10 @@ If you have questions concerning this license or the applicable additional terms
 // (Task C4) to obtain a native HWND via SDL_GetWindowWMInfo.
 SDL_Window *Sys_GetSDLWindow( void );
 
+// GL entry-point resolution for renderer DLLs (refimport GL_GetProcAddress).
+// Wraps SDL_GL_GetProcAddress; defined in sdl_glimp.c.
+void *Sys_GL_GetProcAddress( const char *name );
+
 // Pause/unpause the SDL audio device (focus muting). Defined in sdl_snd.c,
 // called from sdl_input.c's IN_Activate.
 void Sys_SndPause( qboolean pause );

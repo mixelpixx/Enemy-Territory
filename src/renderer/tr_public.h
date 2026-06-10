@@ -31,7 +31,17 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "../cgame/tr_types.h"
 
-#define REF_API_VERSION     8
+#define REF_API_VERSION     9
+
+// RM: optional GL-context request a renderer hands to the engine-side glimp.
+// NULL = legacy behavior (default compatibility context) — renderer1 always
+// passes NULL, so its path is byte-identical to REF_API_VERSION 8.
+typedef struct {
+	int majorVersion;       // e.g. 3
+	int minorVersion;       // e.g. 3
+	qboolean coreProfile;   // request core (with compat fallback)
+	qboolean debugContext;  // request a debug context
+} glimpParams_t;
 
 //
 // these are the functions exported by the refresh module
@@ -202,6 +212,16 @@ typedef struct {
 	void ( *CIN_UploadCinematic )( int handle );
 	int ( *CIN_PlayCinematic )( const char *arg0, int xpos, int ypos, int width, int height, int bits );
 	e_status ( *CIN_RunCinematic )( int handle );
+
+	// RM (REF_API_VERSION 9): engine-side platform services for renderer DLLs.
+	// A renderer built as a DLL must drive the window/GL context and resolve GL
+	// entry points through these instead of linking SDL itself. The built-in
+	// renderer1 ignores them (it calls the glimp statically).
+	void ( *GLimp_Init )( const glimpParams_t *params );
+	void ( *GLimp_Shutdown )( void );
+	void ( *GLimp_EndFrame )( void );
+	void ( *GLimp_SetGamma )( unsigned char red[256], unsigned char green[256], unsigned char blue[256] );
+	void    *( *GL_GetProcAddress )( const char *name );
 
 } refimport_t;
 

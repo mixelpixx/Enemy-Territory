@@ -385,6 +385,7 @@ extern refexport_t re;          // interface to refresh .dll
 //
 // cvars
 //
+extern cvar_t  *cl_renderer;        // RM: "gl1" (built-in, default) or "gl2" (renderer DLL)
 extern cvar_t  *cl_nodelta;
 extern cvar_t  *cl_debugMove;
 extern cvar_t  *cl_noprint;

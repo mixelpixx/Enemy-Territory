@@ -33,6 +33,22 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "snd_local.h" // fretn
 
+// RM: engine-side glimp (src/sys/sdl_glimp.c) — handed to renderer DLLs via
+// refimport (REF_API_VERSION 9). Declared locally: GLimp_* live in tr_local.h,
+// which the client must not include.
+void GLimp_Init( const glimpParams_t *params );
+void GLimp_Shutdown( void );
+void GLimp_EndFrame( void );
+void GLimp_SetGamma( unsigned char red[256], unsigned char green[256], unsigned char blue[256] );
+void *Sys_GL_GetProcAddress( const char *name );
+
+// RM: opt-in renderer DLL loading (src/win32/win_main.c) — declared in
+// win_local.h, which the client does not include.
+void *Sys_LoadRendererDll( const char *name );
+void Sys_UnloadRendererDll( void );
+
+cvar_t  *cl_renderer;           // RM: "gl1" (built-in, default) or "gl2" (renderer DLL)
+
 cvar_t  *cl_wavefilerecord;
 cvar_t  *cl_nodelta;
 cvar_t  *cl_debugMove;
@@ -2914,6 +2930,7 @@ void CL_ShutdownRef( void ) {
 	}
 	re.Shutdown( qtrue );
 	memset( &re, 0, sizeof( re ) );
+	Sys_UnloadRendererDll();   // RM: no-op unless a renderer DLL is loaded
 }
 
 /*
@@ -3217,8 +3234,39 @@ void CL_InitRef( void ) {
 	ri.CIN_PlayCinematic = CIN_PlayCinematic;
 	ri.CIN_RunCinematic = CIN_RunCinematic;
 
-	Com_RMTrace( "CL_InitRef: GetRefAPI..." );
-	ret = GetRefAPI( REF_API_VERSION, &ri );
+	// RM (REF_API_VERSION 9): platform services for renderer DLLs
+	ri.GLimp_Init = GLimp_Init;
+	ri.GLimp_Shutdown = GLimp_Shutdown;
+	ri.GLimp_EndFrame = GLimp_EndFrame;
+	ri.GLimp_SetGamma = GLimp_SetGamma;
+	ri.GL_GetProcAddress = Sys_GL_GetProcAddress;
+
+	// RM: opt-in renderer selection. "gl1" (default) = the built-in, statically
+	// linked original renderer — exactly the legacy path. "gl2" = load
+	// etrm_renderer2.dll; any failure falls back to gl1 with a warning.
+	cl_renderer = Cvar_Get( "cl_renderer", "gl1", CVAR_ARCHIVE | CVAR_LATCH );
+
+	ret = NULL;
+	if ( !Q_stricmp( cl_renderer->string, "gl2" ) ) {
+		refexport_t *( *dllGetRefAPI )( int, refimport_t * );
+
+		Com_RMTrace( "CL_InitRef: loading renderer DLL (cl_renderer gl2)..." );
+		// explicit object->function pointer cast: required idiom for
+		// GetProcAddress-style loaders; implicit conversion is a C constraint
+		// violation that stricter (non-MSVC) compilers reject
+		dllGetRefAPI = ( refexport_t *(*)( int, refimport_t * ) ) Sys_LoadRendererDll( "etrm_renderer2" );
+		if ( dllGetRefAPI ) {
+			ret = dllGetRefAPI( REF_API_VERSION, &ri );
+		}
+		if ( !ret ) {
+			Com_Printf( "^3WARNING: renderer 'gl2' unavailable, falling back to built-in 'gl1'\n" );
+			Sys_UnloadRendererDll();
+		}
+	}
+	if ( !ret ) {
+		Com_RMTrace( "CL_InitRef: GetRefAPI (built-in gl1)..." );
+		ret = GetRefAPI( REF_API_VERSION, &ri );
+	}
 
 	Com_Printf( "-------------------------------\n" );
 
