@@ -3424,7 +3424,7 @@ void CL_Init( void ) {
 
 	// userinfo
 	Cvar_Get( "name", "ETPlayer", CVAR_USERINFO | CVAR_ARCHIVE );
-	Cvar_Get( "rate", "5000", CVAR_USERINFO | CVAR_ARCHIVE );     // NERVE - SMF - changed from 3000
+	Cvar_Get( "rate", "25000", CVAR_USERINFO | CVAR_ARCHIVE );   // RM: modern broadband default (was 5000)
 	Cvar_Get( "snaps", "20", CVAR_USERINFO | CVAR_ARCHIVE );
 //	Cvar_Get ("model", "american", CVAR_USERINFO | CVAR_ARCHIVE );	// temp until we have an skeletal american model
 //	Arnout - no need // Cvar_Get ("model", "multi", CVAR_USERINFO | CVAR_ARCHIVE );

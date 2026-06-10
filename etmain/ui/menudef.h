@@ -105,6 +105,7 @@ If you have questions concerning this license or the applicable additional terms
 #define FEEDER_ALLCAMPAIGNS         0x1b    // Arnout: all campaigns available
 #define FEEDER_PROFILES             0x1c    // Arnout: profiles
 #define FEEDER_GLINFO               0x1d    // Arnout: glinfo
+#define FEEDER_RESOLUTIONS          0x0000001e   // RM: SDL-detected resolutions (r_availableModes)
 
 // display flags
 #define CG_SHOW_BLUE_TEAM_HAS_REDFLAG       0x00000001

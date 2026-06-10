@@ -4293,7 +4293,10 @@ void UI_Update( const char *name ) {
 		trap_Cvar_Set( "name", UI_Cvar_VariableString( "ui_Name" ) );
 	} else if ( Q_stricmp( name, "ui_setRate" ) == 0 ) {
 		float rate = trap_Cvar_VariableValue( "ui_rate" );
-		if ( rate >= 5000 ) {
+		if ( rate >= 25000 ) {
+			trap_Cvar_Set( "ui_cl_maxpackets", "30" );
+			trap_Cvar_Set( "ui_cl_packetdup", "1" );
+		} else if ( rate >= 5000 ) {
 			trap_Cvar_Set( "ui_cl_maxpackets", "30" );
 			trap_Cvar_Set( "ui_cl_packetdup", "1" );
 		} else if ( rate >= 4000 ) {
@@ -6236,6 +6239,33 @@ static void UI_BuildServerStatus( qboolean force ) {
 
 /*
 ==================
+UI_BuildResolutionList
+
+Parse the space-delimited r_availableModes cvar (published by the renderer from
+the SDL-detected display modes) into uiInfo.resolutionList. Cheap; called from
+the feeder count path.
+==================
+*/
+static void UI_BuildResolutionList( void ) {
+	char	buf[1024];
+	char	*p, *tok;
+
+	uiInfo.resolutionCount = 0;
+	trap_Cvar_VariableStringBuffer( "r_availableModes", buf, sizeof( buf ) );
+	p = buf;
+	while ( uiInfo.resolutionCount < UI_MAX_RESOLUTIONS ) {
+		tok = COM_ParseExt( &p, qfalse );
+		if ( !tok[0] ) {
+			break;
+		}
+		Q_strncpyz( uiInfo.resolutionList[uiInfo.resolutionCount], tok,
+					sizeof( uiInfo.resolutionList[0] ) );
+		uiInfo.resolutionCount++;
+	}
+}
+
+/*
+==================
 UI_FeederCount
 ==================
 */
@@ -6254,6 +6284,9 @@ static int UI_FeederCount( float feederID ) {
 		return UI_CampaignCount( feederID == FEEDER_CAMPAIGNS ? qtrue : qfalse );
 	} else if ( feederID == FEEDER_GLINFO ) {
 		return uiInfo.numGlInfoLines;
+	} else if ( feederID == FEEDER_RESOLUTIONS ) {
+		UI_BuildResolutionList();
+		return uiInfo.resolutionCount;
 	} else if ( feederID == FEEDER_PROFILES ) {
 		return uiInfo.profileCount;
 	} else if ( feederID == FEEDER_SERVERS ) {
@@ -6410,6 +6443,11 @@ const char *UI_FeederItemText( float feederID, int index, int column, qhandle_t 
 		} else if ( index >= 4 && index < uiInfo.numGlInfoLines ) {
 			return uiInfo.glInfoLines[index - 4];
 		} else {return "";}
+	} else if ( feederID == FEEDER_RESOLUTIONS ) {
+		if ( index >= 0 && index < uiInfo.resolutionCount ) {
+			return uiInfo.resolutionList[index];
+		}
+		return "";
 	} else if ( feederID == FEEDER_SERVERS ) {
 		if ( index >= 0 && index < uiInfo.serverStatus.numDisplayServers ) {
 			int ping, game, antilag, needpass, friendlyfire, maxlives, punkbuster, weaponrestrictions, balancedteams, serverload;
@@ -6756,6 +6794,21 @@ void UI_FeederSelection( float feederID, int index ) {
 		}
 	} else if ( feederID == FEEDER_GLINFO ) {
 		//
+	} else if ( feederID == FEEDER_RESOLUTIONS ) {
+		if ( index >= 0 && index < uiInfo.resolutionCount ) {
+			// parse "WxH" (manual split on 'x' + atoi; avoids pulling stdio/sscanf)
+			const char	*s = uiInfo.resolutionList[index];
+			const char	*x = strchr( s, 'x' );
+			if ( x ) {
+				int w = atoi( s );
+				int h = atoi( x + 1 );
+				if ( w > 0 && h > 0 ) {
+					trap_Cvar_Set( "r_customwidth",  va( "%d", w ) );
+					trap_Cvar_Set( "r_customheight", va( "%d", h ) );
+					trap_Cvar_Set( "ui_r_mode", "-1" );   // custom; applied via systemCvarsApply
+				}
+			}
+		}
 	} else if ( feederID == FEEDER_SERVERS ) {
 		const char *mapName = NULL;
 
