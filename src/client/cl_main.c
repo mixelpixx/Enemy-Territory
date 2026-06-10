@@ -42,6 +42,13 @@ void GLimp_EndFrame( void );
 void GLimp_SetGamma( unsigned char red[256], unsigned char green[256], unsigned char blue[256] );
 void *Sys_GL_GetProcAddress( const char *name );
 
+// RM: opt-in renderer DLL loading (src/win32/win_main.c) — declared in
+// win_local.h, which the client does not include.
+void *Sys_LoadRendererDll( const char *name );
+void Sys_UnloadRendererDll( void );
+
+cvar_t  *cl_renderer;           // RM: "gl1" (built-in, default) or "gl2" (renderer DLL)
+
 cvar_t  *cl_wavefilerecord;
 cvar_t  *cl_nodelta;
 cvar_t  *cl_debugMove;
@@ -2923,6 +2930,7 @@ void CL_ShutdownRef( void ) {
 	}
 	re.Shutdown( qtrue );
 	memset( &re, 0, sizeof( re ) );
+	Sys_UnloadRendererDll();   // RM: no-op unless a renderer DLL is loaded
 }
 
 /*
@@ -3233,8 +3241,29 @@ void CL_InitRef( void ) {
 	ri.GLimp_SetGamma = GLimp_SetGamma;
 	ri.GL_GetProcAddress = Sys_GL_GetProcAddress;
 
-	Com_RMTrace( "CL_InitRef: GetRefAPI..." );
-	ret = GetRefAPI( REF_API_VERSION, &ri );
+	// RM: opt-in renderer selection. "gl1" (default) = the built-in, statically
+	// linked original renderer — exactly the legacy path. "gl2" = load
+	// etrm_renderer2.dll; any failure falls back to gl1 with a warning.
+	cl_renderer = Cvar_Get( "cl_renderer", "gl1", CVAR_ARCHIVE | CVAR_LATCH );
+
+	ret = NULL;
+	if ( !Q_stricmp( cl_renderer->string, "gl2" ) ) {
+		refexport_t *( *dllGetRefAPI )( int, refimport_t * );
+
+		Com_RMTrace( "CL_InitRef: loading renderer DLL (cl_renderer gl2)..." );
+		dllGetRefAPI = Sys_LoadRendererDll( "etrm_renderer2" );
+		if ( dllGetRefAPI ) {
+			ret = dllGetRefAPI( REF_API_VERSION, &ri );
+		}
+		if ( !ret ) {
+			Com_Printf( "^3WARNING: renderer 'gl2' unavailable, falling back to built-in 'gl1'\n" );
+			Sys_UnloadRendererDll();
+		}
+	}
+	if ( !ret ) {
+		Com_RMTrace( "CL_InitRef: GetRefAPI (built-in gl1)..." );
+		ret = GetRefAPI( REF_API_VERSION, &ri );
+	}
 
 	Com_Printf( "-------------------------------\n" );
 

@@ -92,6 +92,10 @@ LONG WINAPI MainWndProc(
 
 void Conbuf_AppendText( const char *msg );
 
+// RM: opt-in renderer DLL loading — exe directory ONLY (never fs_game/fs_basepath)
+void *Sys_LoadRendererDll( const char *name );
+void Sys_UnloadRendererDll( void );
+
 void SNDDMA_Activate( void );
 int  SNDDMA_InitDS();
 

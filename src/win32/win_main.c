@@ -638,6 +638,61 @@ void * QDECL Sys_LoadDll( const char *name, char *fqpath, intptr_t( QDECL **entr
 
 
 /*
+=================
+Sys_LoadRendererDll / Sys_UnloadRendererDll
+
+RM: load an opt-in renderer DLL (e.g. etrm_renderer2.dll) strictly from the
+directory the executable lives in — NEVER from fs_game/fs_basepath search
+paths, which can contain server-downloaded content. Returns the module's
+GetRefAPI or NULL (caller falls back to the built-in renderer).
+=================
+*/
+static HINSTANCE s_rendererLib = NULL;
+
+void Sys_UnloadRendererDll( void ) {
+	if ( s_rendererLib ) {
+		FreeLibrary( s_rendererLib );
+		s_rendererLib = NULL;
+	}
+}
+
+void *Sys_LoadRendererDll( const char *name ) {
+	char exePath[MAX_PATH];
+	char dllPath[MAX_PATH];
+	char *lastSlash;
+	void *proc;
+
+	if ( s_rendererLib ) {       // one renderer DLL at a time
+		Sys_UnloadRendererDll();
+	}
+
+	if ( !GetModuleFileNameA( NULL, exePath, sizeof( exePath ) ) ) {
+		return NULL;
+	}
+	lastSlash = strrchr( exePath, '\\' );
+	if ( !lastSlash ) {
+		return NULL;
+	}
+	*lastSlash = '\0';
+	Com_sprintf( dllPath, sizeof( dllPath ), "%s\\%s.dll", exePath, name );
+
+	Com_Printf( "Sys_LoadRendererDll: %s\n", dllPath );
+	s_rendererLib = LoadLibraryA( dllPath );
+	if ( !s_rendererLib ) {
+		Com_Printf( "^3WARNING: LoadLibrary failed for %s (err %lu)\n", dllPath, GetLastError() );
+		return NULL;
+	}
+	proc = (void *)GetProcAddress( s_rendererLib, "GetRefAPI" );
+	if ( !proc ) {
+		Com_Printf( "^3WARNING: %s has no GetRefAPI export\n", dllPath );
+		Sys_UnloadRendererDll();
+		return NULL;
+	}
+	return proc;
+}
+
+
+/*
 ========================================================================
 
 BACKGROUND FILE STREAMING
