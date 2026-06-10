@@ -666,11 +666,16 @@ void *Sys_LoadRendererDll( const char *name ) {
 		Sys_UnloadRendererDll();
 	}
 
-	if ( !GetModuleFileNameA( NULL, exePath, sizeof( exePath ) ) ) {
-		return NULL;
+	{
+		DWORD len = GetModuleFileNameA( NULL, exePath, sizeof( exePath ) );
+		if ( !len || len >= sizeof( exePath ) ) {   // failure or truncated path
+			Com_Printf( "^3WARNING: Sys_LoadRendererDll: can't resolve executable path (err %lu)\n", GetLastError() );
+			return NULL;
+		}
 	}
 	lastSlash = strrchr( exePath, '\\' );
 	if ( !lastSlash ) {
+		Com_Printf( "^3WARNING: Sys_LoadRendererDll: unexpected executable path '%s'\n", exePath );
 		return NULL;
 	}
 	*lastSlash = '\0';

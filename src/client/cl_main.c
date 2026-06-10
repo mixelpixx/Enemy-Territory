@@ -3251,7 +3251,10 @@ void CL_InitRef( void ) {
 		refexport_t *( *dllGetRefAPI )( int, refimport_t * );
 
 		Com_RMTrace( "CL_InitRef: loading renderer DLL (cl_renderer gl2)..." );
-		dllGetRefAPI = Sys_LoadRendererDll( "etrm_renderer2" );
+		// explicit object->function pointer cast: required idiom for
+		// GetProcAddress-style loaders; implicit conversion is a C constraint
+		// violation that stricter (non-MSVC) compilers reject
+		dllGetRefAPI = ( refexport_t *(*)( int, refimport_t * ) ) Sys_LoadRendererDll( "etrm_renderer2" );
 		if ( dllGetRefAPI ) {
 			ret = dllGetRefAPI( REF_API_VERSION, &ri );
 		}
