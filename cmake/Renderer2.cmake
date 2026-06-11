@@ -113,9 +113,11 @@ set_target_properties(etrm_r2_shaders PROPERTIES FOLDER "renderer2/tools")
 # ----------------------------------------------------------------------------
 file(GLOB R2_ETL_SRC    "${R2_ETL}/*.c")
 file(GLOB R2_COMMON_SRC "${R2_COMMON}/*.c")
+# tr_image_jpg.c is now BUILT (R2-3 / Task 1): real JPEG decode via the
+# jpeg-6b mem-src shim (bridge/tr2_jpeg_compat.c). Only tr_image_png.c stays
+# excluded until Task 2 vendors puff.c.
 list(REMOVE_ITEM R2_COMMON_SRC
-    "${R2_COMMON}/tr_image_png.c"
-    "${R2_COMMON}/tr_image_jpg.c")
+    "${R2_COMMON}/tr_image_png.c")
 
 # ET:Legacy's shared q_math.c / q_shared.c — the math (vec3/mat4/quat/Matrix*/
 # color tables) and parser/string utilities (COM_Parse*, Q_str*, va, Info_*)
@@ -134,13 +136,14 @@ set(R2_QSHARED_SRC
 #   tr2_bridge_theirs.c — their refimport build + refexport wrap + cvar proxies
 #   tr2_layout_theirs.c — their-world layout table
 #   tr2_engine_stubs.c  — Com_Printf/Error/DPrintf/BlockChecksum (their q_shared)
-#   tr2_png_stub.c / tr2_jpg_stub.c — image-loader stubs (their tr_common/tr_local)
+#   tr2_png_stub.c — PNG-loader stub (their tr_common); removed in Task 2
+#   tr2_jpeg_compat.c — jpeg-6b mem-src shim feeding the real tr_image_jpg.c
 set(R2_BRIDGE_THEIRS_SRC
     "${R2_DIR}/bridge/tr2_bridge_theirs.c"
     "${R2_DIR}/bridge/tr2_layout_theirs.c"
     "${R2_DIR}/bridge/tr2_engine_stubs.c"
     "${R2_DIR}/bridge/tr2_png_stub.c"
-    "${R2_DIR}/bridge/tr2_jpg_stub.c")
+    "${R2_DIR}/bridge/tr2_jpeg_compat.c")
 
 set(R2_CORE_SRC
     ${R2_ETL_SRC}
@@ -190,8 +193,21 @@ target_compile_definitions(etrm_renderer2_core PUBLIC ${R2_DEFINES})
 target_link_libraries(etrm_renderer2_core PUBLIC
     etrm_glew
     zlibstatic
-    opengl32)
+    opengl32
+    etrm_jpeg)   # R2-3 T1: real JPEG decode (linked, but headers SCOPED below)
 set_target_properties(etrm_renderer2_core PROPERTIES FOLDER "renderer2")
+
+# R2-3 / Task 1: jpeg-6b headers are needed by EXACTLY two TUs — the vendored
+# decoder tr_image_jpg.c and our mem-src shim tr2_jpeg_compat.c. We link the
+# whole core lib against etrm_jpeg (for the symbols) but DELIBERATELY do not let
+# etrm_jpeg's PUBLIC include dir leak into the rest of the vendored tree (jpeg-6b
+# defines `boolean`/`INT32` that would clash elsewhere). Scope src/jpeg-6 to just
+# those two source files via set_source_files_properties INCLUDE_DIRECTORIES.
+set_source_files_properties(
+    "${R2_COMMON}/tr_image_jpg.c"
+    "${R2_DIR}/bridge/tr2_jpeg_compat.c"
+    TARGET_DIRECTORY etrm_renderer2_core
+    PROPERTIES INCLUDE_DIRECTORIES "${ETRM_SRC}/jpeg-6")
 
 # zlib's headers (source + generated zconf.h build dir).
 target_include_directories(etrm_renderer2_core PUBLIC
