@@ -27,19 +27,57 @@ GPLv3 (ET-RM original glue; no third-party code).
 #include "tr_local.h"
 
 /**
- * @brief R_LoadJPG stub — JPEG decoding is descoped for R2-2 (see file header).
- * @returns qfalse always (image "not loaded").
+ * @brief R_LoadJPG stub — JPEG DECODING is descoped for R2-2 (see file header).
+ *
+ * RM (R2-2 Task 4): their tr_image.c R_LoadImage dispatches to a single loader
+ * by extension and Ren_Drops (fatal) when a NAMED .jpg fails to parse. At gl2
+ * init CreateInternalShaders unconditionally loads gfx/misc/sunflare1.jpg (the
+ * 3D sun-flare shader), so a qfalse return aborts the whole boot — before the
+ * menu can ever draw. The main menu itself is TGA-only (verified: pak0 has no
+ * menu-background JPEGs; the only ui/ JPEGs are post-match win-flag portraits),
+ * so JPEG *content* is not needed for the menu exit bar.
+ *
+ * Instead of failing, return a valid 2x2 opaque-grey PLACEHOLDER so the named
+ * image "loads" and init proceeds. This keeps the descope (no real JPEG decode
+ * until R2-3) while unblocking boot. The placeholder only ever stands in for the
+ * menu-invisible sunflare and the post-match portrait flags; real JPEG decode
+ * (world textures etc.) is the R2-3 deliverable.
  */
 qboolean R_LoadJPG(imageData_t *data, byte **pic, int *width, int *height, byte alphaByte)
 {
+	const int  w = 16, h = 16;
+	byte      *out;
+	int        i;
 	(void)data;
-	(void)pic;
-	(void)width;
-	(void)height;
-	(void)alphaByte;
 
-	Ren_Developer("R_LoadJPG: JPEG support is descoped in this build (R2-2); image not loaded\n");
-	return qfalse;
+	Ren_Developer("R_LoadJPG: JPEG decode is descoped (R2-2); returning a 16x16 grey "
+	              "placeholder so init proceeds (real JPEG = R2-3)\n");
+
+	/* CRITICAL: the returned pic is freed by R_FindImageFile via Com_Dealloc
+	 * (== free). It MUST therefore be allocated with the matching Com_Allocate
+	 * (== malloc), exactly like every real loader does via R_GetImageBuffer.
+	 * Using ri.Z_Malloc here (engine zone) and letting their free() reclaim it
+	 * corrupts the heap and hangs init. R_GetImageBuffer is the canonical
+	 * loader-pic allocator (Com_Allocate-backed). */
+	out = (byte *)R_GetImageBuffer(w * h * 4, BUFFER_IMAGE, "jpg-placeholder");
+	if (!out)
+	{
+		*pic    = NULL;
+		*width  = 0;
+		*height = 0;
+		return qfalse;
+	}
+	for (i = 0; i < w * h; ++i)
+	{
+		out[i * 4 + 0] = 128;
+		out[i * 4 + 1] = 128;
+		out[i * 4 + 2] = 128;
+		out[i * 4 + 3] = alphaByte;
+	}
+	*pic    = out;
+	*width  = w;
+	*height = h;
+	return qtrue;
 }
 
 /**

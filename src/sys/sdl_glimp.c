@@ -368,14 +368,88 @@ static qboolean GLW_CreateWindowAndContext( int width, int height, Uint32 flags,
 ** request from the renderer (DLL renderers); NULL = legacy default
 ** compatibility context (renderer1's path, identical to pre-v9 behavior).
 */
+/*
+** GLimp_RegisterPlatformCvars
+**
+** RM (R2-2 Task 4): this SDL platform layer (engine-resident, shared by gl1 and
+** gl2) dereferences a set of display/context cvar GLOBALS (r_mode, r_fullscreen,
+** r_colorbits, ... — declared in tr_local.h, defined in the gl1 renderer). Under
+** gl1 those globals are populated by the built-in renderer's R_Register before
+** GLimp_Init runs. Under `cl_renderer gl2` the built-in R_Register never runs, so
+** the globals are NULL and GLimp_Init crashes the moment it reads r_mode->integer.
+**
+** This helper registers exactly those platform-shared cvars (using the gl1
+** defaults/flags verbatim) into the very same globals, but ONLY when they are
+** still NULL. Under gl1 every global is already non-NULL, so the whole block is
+** skipped and gl1 stays byte-identical. The engine Cvar_Get returns the same
+** cvar_t* for a name regardless of caller, so when the gl2 renderer registers its
+** own r_mode etc. through the bridge proxy it shares this very cvar.
+*/
+static void GLimp_RegisterPlatformCvars( void ) {
+	if ( !r_mode ) {
+		r_mode = ri.Cvar_Get( "r_mode", "-2", CVAR_ARCHIVE | CVAR_LATCH | CVAR_UNSAFE );
+	}
+	if ( !r_fullscreen ) {
+		r_fullscreen = ri.Cvar_Get( "r_fullscreen", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	}
+	if ( !r_colorbits ) {
+		r_colorbits = ri.Cvar_Get( "r_colorbits", "0", CVAR_ARCHIVE | CVAR_LATCH | CVAR_UNSAFE );
+	}
+	if ( !r_depthbits ) {
+		r_depthbits = ri.Cvar_Get( "r_depthbits", "0", CVAR_ARCHIVE | CVAR_LATCH | CVAR_UNSAFE );
+	}
+	if ( !r_stencilbits ) {
+		r_stencilbits = ri.Cvar_Get( "r_stencilbits", "0", CVAR_ARCHIVE | CVAR_LATCH | CVAR_UNSAFE );
+	}
+	if ( !r_ignorehwgamma ) {
+		r_ignorehwgamma = ri.Cvar_Get( "r_ignorehwgamma", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	}
+	if ( !r_swapInterval ) {
+		r_swapInterval = ri.Cvar_Get( "r_swapInterval", "0", CVAR_ARCHIVE );
+	}
+	if ( !r_drawBuffer ) {
+		r_drawBuffer = ri.Cvar_Get( "r_drawBuffer", "GL_BACK", CVAR_CHEAT );
+	}
+	if ( !r_logFile ) {
+		r_logFile = ri.Cvar_Get( "r_logFile", "0", CVAR_CHEAT );
+	}
+	if ( !r_allowExtensions ) {
+		r_allowExtensions = ri.Cvar_Get( "r_allowExtensions", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_UNSAFE );
+	}
+	if ( !r_ext_compressed_textures ) {
+		r_ext_compressed_textures = ri.Cvar_Get( "r_ext_compressed_textures", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_UNSAFE );
+	}
+	if ( !r_ext_multitexture ) {
+		r_ext_multitexture = ri.Cvar_Get( "r_ext_multitexture", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_UNSAFE );
+	}
+	if ( !r_ext_compiled_vertex_array ) {
+		r_ext_compiled_vertex_array = ri.Cvar_Get( "r_ext_compiled_vertex_array", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_UNSAFE );
+	}
+	if ( !r_ext_texture_env_add ) {
+		r_ext_texture_env_add = ri.Cvar_Get( "r_ext_texture_env_add", "1", CVAR_ARCHIVE | CVAR_LATCH | CVAR_UNSAFE );
+	}
+	if ( !r_ext_texture_filter_anisotropic ) {
+		r_ext_texture_filter_anisotropic = ri.Cvar_Get( "r_ext_texture_filter_anisotropic", "0", CVAR_ARCHIVE | CVAR_LATCH | CVAR_UNSAFE );
+	}
+	if ( !r_ext_NV_fog_dist ) {
+		r_ext_NV_fog_dist = ri.Cvar_Get( "r_ext_NV_fog_dist", "0", CVAR_ARCHIVE | CVAR_LATCH | CVAR_UNSAFE );
+	}
+}
+
 void GLimp_Init( const glimpParams_t *params ) {
 	char buf[1024];
-	cvar_t *lastValidRenderer = ri.Cvar_Get( "r_lastValidRenderer", "(uninitialized)", CVAR_ARCHIVE );
+	cvar_t *lastValidRenderer;
 	int width, height;
 	float windowAspect = 0;
 	Uint32 flags;
 	int colorbits, depthbits, stencilbits;
 	int realDepth = 0, realStencil = 0;
+
+	// gl2: ensure the platform-shared display/context cvar globals exist before
+	// any are dereferenced below (no-op under gl1 — already registered).
+	GLimp_RegisterPlatformCvars();
+
+	lastValidRenderer = ri.Cvar_Get( "r_lastValidRenderer", "(uninitialized)", CVAR_ARCHIVE );
 
 	ri.Printf( PRINT_ALL, "Initializing OpenGL subsystem (SDL2)\n" );
 
@@ -581,13 +655,29 @@ void GLimp_Init( const glimpParams_t *params ) {
 		}
 	}
 
-	// GL strings
-	Q_strncpyz( glConfig.vendor_string, (const char *)qglGetString( GL_VENDOR ), sizeof( glConfig.vendor_string ) );
-	Q_strncpyz( glConfig.renderer_string, (const char *)qglGetString( GL_RENDERER ), sizeof( glConfig.renderer_string ) );
-	Q_strncpyz( glConfig.version_string, (const char *)qglGetString( GL_VERSION ), sizeof( glConfig.version_string ) );
-	Q_strncpyz( glConfig.extensions_string, (const char *)qglGetString( GL_EXTENSIONS ), sizeof( glConfig.extensions_string ) );
-	if ( strlen( (const char *)qglGetString( GL_EXTENSIONS ) ) >= sizeof( glConfig.extensions_string ) ) {
-		Com_Printf( S_COLOR_YELLOW "WARNING: GL extensions string too long, truncated\n" );
+	// GL strings.
+	// RM (R2-2 Task 4): under a CORE-profile context (the gl2 renderer requests
+	// 3.3 core via glimpParams), the legacy glGetString(GL_EXTENSIONS) enum is
+	// removed and returns NULL — feeding NULL to Q_strncpyz fatals ("NULL src").
+	// Null-guard every GL string. The compat/default (gl1, params==NULL) path is
+	// unchanged: those strings are non-NULL there, so the guards never fire and
+	// the legacy GL_EXTENSIONS string is still captured byte-identically. In a
+	// core context the engine glConfig.extensions_string is left empty here; the
+	// gl2 renderer builds its own extension list via glGetStringi in the bridge,
+	// so this engine-side copy is informational only under gl2.
+	{
+		const char *glVendor   = (const char *)qglGetString( GL_VENDOR );
+		const char *glRenderer = (const char *)qglGetString( GL_RENDERER );
+		const char *glVersion  = (const char *)qglGetString( GL_VERSION );
+		const char *glExt      = (const char *)qglGetString( GL_EXTENSIONS );
+
+		Q_strncpyz( glConfig.vendor_string, glVendor ? glVendor : "", sizeof( glConfig.vendor_string ) );
+		Q_strncpyz( glConfig.renderer_string, glRenderer ? glRenderer : "", sizeof( glConfig.renderer_string ) );
+		Q_strncpyz( glConfig.version_string, glVersion ? glVersion : "", sizeof( glConfig.version_string ) );
+		Q_strncpyz( glConfig.extensions_string, glExt ? glExt : "", sizeof( glConfig.extensions_string ) );
+		if ( glExt && strlen( glExt ) >= sizeof( glConfig.extensions_string ) ) {
+			Com_Printf( S_COLOR_YELLOW "WARNING: GL extensions string too long, truncated\n" );
+		}
 	}
 
 	//

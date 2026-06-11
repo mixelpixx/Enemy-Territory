@@ -136,6 +136,21 @@ vm_t                *cgvm;
 // Structure containing functions exported from refresh DLL
 refexport_t re;
 
+// RM (R2-2 Task 4): the engine-resident SDL platform layer (sdl_glimp.c /
+// sdl_qgl.c) reads the gl1 renderer's `ri`/`glConfig` globals (externed via
+// tr_local.h) for Printf/Error/Cvar_*/window-config during GLimp_Init. Under
+// gl1 those globals are populated by the built-in GetRefAPI (ri = *imp). Under
+// `cl_renderer gl2` the built-in GetRefAPI is never called, so that shared `ri`
+// stays NULL and GLimp_Init crashes at its first ri.Cvar_Get. CL_SetPlatformRefImport
+// copies the engine's assembled refimport into that shared platform global so
+// the GLimp/QGL platform code works regardless of which renderer is active.
+// (gl1 path is unaffected: the built-in GetRefAPI overwrites it with the same
+// struct moments later — byte-identical behavior.)
+extern refimport_t ri;   // defined in src/renderer/tr_main.c (gl1, static-linked)
+void CL_SetPlatformRefImport( const refimport_t *imp ) {
+	ri = *imp;
+}
+
 ping_t cl_pinglist[MAX_PINGREQUESTS];
 
 typedef struct serverStatus_s
@@ -3249,6 +3264,12 @@ void CL_InitRef( void ) {
 	ret = NULL;
 	if ( !Q_stricmp( cl_renderer->string, "gl2" ) ) {
 		refexport_t *( *dllGetRefAPI )( int, refimport_t * );
+
+		// the DLL renderer drives the engine-resident SDL GLimp/QGL platform code
+		// through ri.GLimp_Init; that platform code reads the shared `ri` global,
+		// which the built-in (gl1) GetRefAPI would normally populate. Seed it here
+		// so GLimp_Init has valid Printf/Error/Cvar_* before the DLL runs.
+		CL_SetPlatformRefImport( &ri );
 
 		Com_RMTrace( "CL_InitRef: loading renderer DLL (cl_renderer gl2)..." );
 		// explicit object->function pointer cast: required idiom for

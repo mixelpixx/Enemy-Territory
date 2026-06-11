@@ -29,6 +29,33 @@ GPLv3 (ET-RM original glue; no third-party code).
 #include "tr2_bridge.h"
 
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+/* ------------------------------------------------------------------------ *
+ *  Bridge-local trace — mirrors the engine's Com_RMTrace (ETRM_TRACE env var,
+ *  flush-on-write, open/append each call). The engine's helper is not exported
+ *  to the DLL, so the bridge writes the same file independently. Used to
+ *  bisect crashes inside their renderer's init/frame paths. Visible to the
+ *  theirs-TU via Brdg_Trace below.
+ * ------------------------------------------------------------------------ */
+void Brdg_Trace(const char *msg)
+{
+	const char *path = getenv("ETRM_TRACE");
+	FILE       *f;
+	if (!path || !path[0])
+	{
+		return;
+	}
+	f = fopen(path, "a");
+	if (f)
+	{
+		fputs("[r2] ", f);
+		fputs(msg ? msg : "(null)", f);
+		fputc('\n', f);
+		fclose(f);
+	}
+}
 
 /* local NUL-terminated bounded copy — avoids depending on the vendored
  * Q_strncpyz (which lives in the core lib compiled against THEIR headers). */

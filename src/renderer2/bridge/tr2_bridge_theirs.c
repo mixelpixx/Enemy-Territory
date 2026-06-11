@@ -570,9 +570,11 @@ static void imp_GLimp_Init(glconfig_t *glConfig, const char *glConfigString)
 	GLenum err;
 	(void)glConfigString;   /* we hardcode the 3.3-core request into our glimp */
 
+	Brdg_Trace("imp_GLimp_Init: enter");
 	/* 1. bring up the engine's SDL window + GL 3.3 core context (compat ladder
 	 * lives engine-side). */
 	BrdgOur_GLimp_Init(3, 3, 1 /*core*/, 0 /*debug*/);
+	Brdg_Trace("imp_GLimp_Init: BrdgOur_GLimp_Init returned");
 
 	/* 2. resolve GL entry points. GLEW under a core context needs experimental
 	 * mode (else glGetStringi/extension queries it gates on the legacy string
@@ -591,12 +593,14 @@ static void imp_GLimp_Init(glconfig_t *glConfig, const char *glConfigString)
 		(void)glGetError();
 		g_glewReady = 1;
 	}
+	Brdg_Trace("imp_GLimp_Init: glewInit done");
 
 	/* 3. fill THEIR glconfig the way their engine normally would. */
 	if (glConfig)
 	{
 		Brdg_FillGlconfigGL(glConfig);
 	}
+	Brdg_Trace("imp_GLimp_Init: glconfig filled, returning");
 }
 
 static void imp_GLimp_Shutdown(void)   { BrdgOur_GLimp_Shutdown(); }
@@ -711,7 +715,9 @@ static void Brdg_BuildRefimport(void)
 
 static void re_BeginRegistration(void *ourGlconfig)
 {
+	Brdg_Trace("re_BeginRegistration: calling theirRE->BeginRegistration");
 	theirRE->BeginRegistration(&bridgeGlconfig);
+	Brdg_Trace("re_BeginRegistration: theirRE->BeginRegistration returned");
 	BrdgOur_GlconfigCopyBack(
 		bridgeGlconfig.renderer_string, bridgeGlconfig.vendor_string,
 		bridgeGlconfig.version_string, bridgeGlconfig.extensions_string,

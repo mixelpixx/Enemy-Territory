@@ -80,6 +80,9 @@ int  Brdg_TheirsInit(int engineApiVersion);
 void  BrdgOur_Print(int printLevel, const char *msg);     /* pre-formatted text */
 void  BrdgOur_Error(int errorLevel, const char *msg);     /* noreturn on engine side */
 
+/* bridge-local trace to ETRM_TRACE (crash bisection; flush-on-write). */
+void  Brdg_Trace(const char *msg);
+
 /* timing */
 int   BrdgOur_Milliseconds(void);
 
