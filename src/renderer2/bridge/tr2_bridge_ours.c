@@ -292,6 +292,19 @@ int BrdgOur_CIN_RunCinematic(int handle)
 	return ri.CIN_RunCinematic ? (int)ri.CIN_RunCinematic(handle) : 0;
 }
 
+/* RM R2-4: collision-model services. Our vec3_t is float[3] (decays to
+ * const float*), clipHandle_t is int — the neutral primitive signatures
+ * re-type without conversion. */
+int BrdgOur_CmPointContents(const float *p, int model)
+{
+	return (ri.CM_PointContents && p) ? ri.CM_PointContents(p, (clipHandle_t)model) : 0;
+}
+
+void BrdgOur_CmDrawDebugSurface(void (*drawPoly)(int color, int numPoints, float *points))
+{
+	if (ri.CM_DrawDebugSurface) { ri.CM_DrawDebugSurface(drawPoly); }
+}
+
 void BrdgOur_GLimp_Init(int major, int minor, int coreProfile, int debugContext)
 {
 	glimpParams_t params;

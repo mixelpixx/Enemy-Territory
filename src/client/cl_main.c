@@ -3233,6 +3233,7 @@ void CL_InitRef( void ) {
 	ri.Hunk_AllocateTempMemory = Hunk_AllocateTempMemory;
 	ri.Hunk_FreeTempMemory = Hunk_FreeTempMemory;
 	ri.CM_DrawDebugSurface = CM_DrawDebugSurface;
+	ri.CM_PointContents = CM_PointContents;	// RM R2-4 (v10): renderer2 light-grid solid checks
 	ri.FS_ReadFile = FS_ReadFile;
 	ri.FS_FreeFile = FS_FreeFile;
 	ri.FS_WriteFile = FS_WriteFile;

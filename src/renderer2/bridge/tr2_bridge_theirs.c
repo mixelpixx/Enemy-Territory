@@ -17,8 +17,10 @@ q_shared.h subset, GLEW). Responsibilities:
                           trio over our FS_ReadFile; zlib_* -> linked zlib).
        (c) SAFE STUB    — service our engine doesn't expose / owns elsewhere
                           (IN_*, Sys_GLimp/SetEnv, CL_VideoRecording/WriteAVI,
-                          Cvar_CheckRange/SetDescription, CM_PointContents,
+                          Cvar_CheckRange/SetDescription,
                           GLimp_SplashImage) — logged-once.
+                          (CM_PointContents/CM_DrawDebugSurface became real
+                          passthroughs in R2-4 via the v10 refimport.)
 
   2. CVAR PROXY LAYER: a bridge-owned registry of THEIR-layout cvar_t proxies,
      synced from our cvars on Cvar_Get and once per frame (BeginFrame wrap).
@@ -317,22 +319,28 @@ static void imp_Cmd_ExecuteText(int exec_when, const char *text)
 }
 
 /* ======================================================================== *
- *  refimport: collision-debug  (SAFE STUB — menu has no collision model)
+ *  refimport: collision model  (PASSTHROUGH — RM R2-4, ri v10)
+ *
+ *  CM_PointContents was a logged-once 0 stub through R2-3 (our v9 refimport
+ *  had no CM_PointContents), which made tr_bsp.c's light-grid setup treat
+ *  every grid point as non-solid — subtly wrong ambient/directed light on
+ *  every map. The v10 refimport appends the real engine entry; forward it.
+ *  Their vec3_t is float[3] (decays to const float*) and clipHandle_t is int,
+ *  so the neutral primitive signature re-types without conversion.
+ *
+ *  CM_DrawDebugSurface IS on our ri (it always was — the old no-op comment
+ *  claiming otherwise was wrong); the drawPoly callback signature is identical
+ *  primitive types in both worlds, so the fn-ptr forwards verbatim.
  * ======================================================================== */
 
-static int g_warnedPointContents;
 static int imp_CM_PointContents(const vec3_t p, clipHandle_t model)
 {
-	(void)p; (void)model;
-	LogOnce(&g_warnedPointContents,
-	        "renderer2 bridge: CM_PointContents stubbed to 0 (no clip model on the "
-	        "DLL side; only used for decal/mark culling — safe at menu)\n");
-	return 0;
+	return BrdgOur_CmPointContents(p, (int)model);
 }
 
 static void imp_CM_DrawDebugSurface(void (*drawPoly)(int color, int numPoints, float *points))
 {
-	(void)drawPoly;   /* engine's CM_DrawDebugSurface is not on our v9 ri; no-op */
+	BrdgOur_CmDrawDebugSurface(drawPoly);
 }
 
 /* ======================================================================== *

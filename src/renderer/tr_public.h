@@ -31,7 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "../cgame/tr_types.h"
 
-#define REF_API_VERSION     9
+#define REF_API_VERSION     10
 
 // RM: optional GL-context request a renderer hands to the engine-side glimp.
 // NULL = legacy behavior (default compatibility context) — renderer1 always
@@ -222,6 +222,12 @@ typedef struct {
 	void ( *GLimp_EndFrame )( void );
 	void ( *GLimp_SetGamma )( unsigned char red[256], unsigned char green[256], unsigned char blue[256] );
 	void    *( *GL_GetProcAddress )( const char *name );
+
+	// RM R2-4 (REF_API_VERSION 10): renderer2's light grid needs real solid
+	// checks (the bridge stub returned 0, subtly skewing ambient/directed light).
+	// Appended at the END so all earlier offsets are unchanged; the statically
+	// linked gl1 renderer never reads this field.
+	int ( *CM_PointContents )( const vec3_t p, clipHandle_t model );
 
 } refimport_t;
 

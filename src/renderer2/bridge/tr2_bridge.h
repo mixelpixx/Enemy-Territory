@@ -59,7 +59,7 @@ extern "C" {
  *  OURS-TU -> THEIRS-TU : initialization handshake.
  *
  *  tr2_bridge_ours.c calls Brdg_TheirsInit() from inside GetRefAPI, passing
- *  the apiVersion the engine requested (9). The theirs-TU builds their
+ *  the apiVersion the engine requested (10 since R2-4). The theirs-TU builds their
  *  refimport, calls ETL_GetRefAPI(THEIR_REF_API_VERSION, &theirRI), runs the
  *  layout check, and returns 1 on success (their refexport captured), 0 on
  *  failure (mismatched api / layout / null re) — in which case GetRefAPI
@@ -138,6 +138,13 @@ void  BrdgOur_GlconfigCopyBack(
 	int driverType, int hardwareType, int deviceSupportsGamma, int textureCompression,
 	int vidWidth, int vidHeight, float windowAspect, int displayFrequency,
 	int isFullscreen, void *ourGlconfig);
+
+/* collision model (RM R2-4, ri v10): real solid checks for renderer2's light
+ * grid (vec3_t/clipHandle_t differ per world -> primitives only here), and the
+ * debug-surface walker (the drawPoly callback signature is identical primitive
+ * types in both worlds, so the fn-ptr passes through verbatim). */
+int   BrdgOur_CmPointContents(const float *p, int model);
+void  BrdgOur_CmDrawDebugSurface(void (*drawPoly)(int color, int numPoints, float *points));
 
 /* GL window/context platform services (engine owns the SDL window) */
 void  BrdgOur_GLimp_Init(int major, int minor, int coreProfile, int debugContext);
