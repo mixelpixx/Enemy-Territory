@@ -186,6 +186,15 @@ JMSG_LASTMSGCODE
 #ifndef JERROR_H
 #define JERROR_H
 
+/* ET-RM: optional per-module hooks for the DEFAULT error handlers in jerror.c.
+ * Both default to NULL (stock stderr/exit behavior).  A host that wants
+ * engine-integrated error reporting (e.g. gl1's renderer routing fatal errors
+ * through ri.Error) assigns these at init time.  The fatal hook MUST NOT
+ * return if set.  Note these are plain globals: each module linking its own
+ * copy of the jpeg-6 static lib gets its own, independently-NULL pair. */
+extern void ( *jpeg_fatal_error_hook )( const char *msg );   /* must not return */
+extern void ( *jpeg_output_message_hook )( const char *msg );
+
 /* Macros to simplify using the error and trace message stuff */
 /* The first parameter is either type of cinfo pointer */
 

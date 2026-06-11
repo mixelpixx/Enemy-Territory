@@ -181,9 +181,17 @@ qboolean R_LoadJPG(imageData_t *data, unsigned char **pic, int *width, int *heig
 
 	pixelcount = cinfo.output_width * cinfo.output_height;
 
+	/* ET-RM R2-3 T3: our bundled jpeg-6b is patched with RGB_PIXELSIZE=4
+	 * (jpeg-6/jmorecfg.h, an id-Software customization the gl1 renderer relies
+	 * on), so JCS_RGB decompression yields output_components==4 (R,G,B,pad)
+	 * rather than the standard 3. Accept BOTH widths: 3 -> expand RGB->RGBA
+	 * below; 4 -> jpeg already wrote a 4-wide buffer, just set alpha (mirrors
+	 * src/renderer/tr_image.c::LoadJPG). Without this, every world JPEG texture
+	 * ERR_DROPs under gl2 ("invalid image format ... components: 4"). */
 	if (!cinfo.output_width || !cinfo.output_height
 	    || ((pixelcount * 4) / cinfo.output_width) / 4 != cinfo.output_height
-	    || pixelcount > 0x1FFFFFFF || cinfo.output_components != 3
+	    || pixelcount > 0x1FFFFFFF
+	    || (cinfo.output_components != 3 && cinfo.output_components != 4)
 	    )
 	{
 		// Free the memory to make sure we don't leak memory
@@ -220,19 +228,33 @@ qboolean R_LoadJPG(imageData_t *data, unsigned char **pic, int *width, int *heig
 
 	buf = out;
 
-	// Expand from RGB to RGBA
-	sindex = pixelcount * cinfo.output_components;
-	dindex = memcount;
-
-	do
+	if (cinfo.output_components == 4)
 	{
-		buf[--dindex] = 255;
-		buf[--dindex] = buf[--sindex];
-		buf[--dindex] = buf[--sindex];
-		buf[--dindex] = buf[--sindex];
-
+		/* ET-RM R2-3 T3: jpeg-6b (RGB_PIXELSIZE=4) already produced a 4-wide
+		 * buffer in place; only the alpha (every 4th byte) is uninitialised.
+		 * Set it to 255 — do NOT run the 3->4 expansion (which would misread
+		 * the 4-wide source). Matches src/renderer/tr_image.c::LoadJPG. */
+		for (dindex = 3; dindex < memcount; dindex += 4)
+		{
+			buf[dindex] = 255;
+		}
 	}
-	while (sindex);
+	else
+	{
+		// Expand from RGB to RGBA
+		sindex = pixelcount * cinfo.output_components;
+		dindex = memcount;
+
+		do
+		{
+			buf[--dindex] = 255;
+			buf[--dindex] = buf[--sindex];
+			buf[--dindex] = buf[--sindex];
+			buf[--dindex] = buf[--sindex];
+
+		}
+		while (sindex);
+	}
 
 	*pic = out;
 

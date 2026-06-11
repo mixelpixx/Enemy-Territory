@@ -600,6 +600,29 @@ static void imp_GLimp_Init(glconfig_t *glConfig, const char *glConfigString)
 	{
 		Brdg_FillGlconfigGL(glConfig);
 	}
+
+	/* 4. populate THEIR glConfig2 capability flags (textureNPOTAvailable,
+	 * float/depth/draw-buffer caps, etc.) by running the renderer's own
+	 * extension-detection. In stock ET:Legacy the engine calls
+	 * re.InitOpenGLSubSystem() before BeginRegistration; our v9 engine never
+	 * does, so without this glConfig2 stays all-zero. The most visible fallout
+	 * was textureNPOTAvailable==qfalse, which makes R_CreateRenderImage round
+	 * the screen-capture images (e.g. _currentRender) up to the next power of
+	 * two (1920x1200 -> 2048x2048). RB_ColorCorrection then copies a 2048x2048
+	 * region from the real 1920x1200 backbuffer but redraws it on a 1920x1200
+	 * screen quad with 0..1 texcoords, squashing the entire 2D image (menu +
+	 * cursor) toward the top-left while engine-side mouse hit-testing still
+	 * uses true 1920x1200 — the reported "invisible barrier" near the bottom of
+	 * the main menu. RE_InitOpenGl (re.InitOpenGL) builds the extension list and
+	 * runs GLimp_InitExtensionsR2, which is where glConfig2's caps get set; it
+	 * only queries GL (no context/window creation) so it is safe to call here
+	 * after the context is live. */
+	if (theirRE && theirRE->InitOpenGL)
+	{
+		Brdg_Trace("imp_GLimp_Init: calling theirRE->InitOpenGL (runs GLimp_InitExtensionsR2 -> fills glConfig2)");
+		theirRE->InitOpenGL();
+	}
+
 	Brdg_Trace("imp_GLimp_Init: glconfig filled, returning");
 }
 

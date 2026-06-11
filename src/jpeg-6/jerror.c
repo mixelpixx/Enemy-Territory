@@ -19,11 +19,22 @@
 #include "jversion.h"
 #include "jerror.h"
 
-#include "../renderer/tr_local.h"
+/* ET-RM R2-3 T3 (MECHANICAL vendored edit): drop the gl1 `../renderer/tr_local.h`
+ * coupling (its global `refimport_t ri` is unpopulated under the renderer2 DLL —
+ * see jmemnobs.c).  Revert error_exit/output_message to STOCK jpeg-6b behavior
+ * (stderr + exit) so the decoder is renderer-agnostic. */
+#include <stdio.h>
+#include <stdlib.h>
 
 #ifndef EXIT_FAILURE        /* define exit() codes if not provided */
 #define EXIT_FAILURE  1
 #endif
+
+/* ET-RM: optional per-module hooks (declared in jerror.h).  NULL by default ->
+ * stock jpeg-6b stderr/exit behavior.  gl1's renderer assigns these in R_Init
+ * so a corrupt jpg produces a clean ri.Error(ERR_FATAL) instead of exit(1). */
+void ( *jpeg_fatal_error_hook )( const char *msg ) = NULL;   /* must not return */
+void ( *jpeg_output_message_hook )( const char *msg ) = NULL;
 
 
 /*
@@ -69,7 +80,18 @@ error_exit( j_common_ptr cinfo ) {
 	/* Let the memory manager delete any temp files before we die */
 	jpeg_destroy( cinfo );
 
-	ri.Error( ERR_FATAL, "%s\n", buffer );
+	/* If the host module installed a fatal hook, route the message there
+	 * (gl1: ri.Error(ERR_FATAL) — clean dialog + shutdown + gamma restore).
+	 * The hook must not return. */
+	if ( jpeg_fatal_error_hook ) {
+		( *jpeg_fatal_error_hook )( buffer );
+	}
+
+	/* STOCK jpeg-6b fallback: print to stderr and exit.  In practice the
+	 * renderer2 DLL's tr_image_jpg.c installs its own error_exit
+	 * (setjmp/longjmp) so this default is only a last-resort fallback. */
+	fprintf( stderr, "%s\n", buffer );
+	exit( EXIT_FAILURE );
 }
 
 
@@ -86,8 +108,15 @@ output_message( j_common_ptr cinfo ) {
 	/* Create the message */
 	( *cinfo->err->format_message )( cinfo, buffer );
 
-	/* Send it to stderr, adding a newline */
-	ri.Printf( PRINT_ALL, "%s\n", buffer );
+	/* If the host module installed an output hook, route the message there
+	 * (gl1: ri.Printf to the console). */
+	if ( jpeg_output_message_hook ) {
+		( *jpeg_output_message_hook )( buffer );
+		return;
+	}
+
+	/* Send it to stderr, adding a newline (STOCK jpeg-6b). */
+	fprintf( stderr, "%s\n", buffer );
 }
 
 

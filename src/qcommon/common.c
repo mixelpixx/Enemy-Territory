@@ -3008,24 +3008,13 @@ void Com_Init( char *commandLine ) {
 	Cvar_Set( "com_recommendedSet", "1" );
 
 	if ( !com_dedicated->integer ) {
-		// RM (R2-2 Task 4): the intro RoQ (DrawStretchRaw/UploadCinematic path)
-		// crashes under the gl2 renderer (vendored ET:Legacy renderer2) during
-		// cinematic setup. Per the R2-2 plan this is an acceptable, logged
-		// descope for the boot-to-menu increment — the cinematic path returns in
-		// R2-3. Under gl1 the intro plays exactly as before (byte-identical).
-		cvar_t *clRenderer = Cvar_Get( "cl_renderer", "gl1", CVAR_ARCHIVE | CVAR_LATCH );
-		if ( clRenderer && !Q_stricmp( clRenderer->string, "gl2" ) ) {
-			Com_Printf( S_COLOR_YELLOW "gl2: skipping intro cinematic (etintro.roq) — "
-			            "RoQ/DrawStretchRaw path descoped to R2-3\n" );
-		} else {
-			//Cvar_Set( "com_logosPlaying", "1" );
-			Cbuf_AddText( "cinematic etintro.roq\n" );
-			/*Cvar_Set( "nextmap", "cinematic avlogo.roq" );
-			if( !com_introPlayed->integer ) {
-				Cvar_Set( com_introPlayed->name, "1" );
-				//Cvar_Set( "nextmap", "cinematic avlogo.roq" );
-			}*/
-		}
+		//Cvar_Set( "com_logosPlaying", "1" );
+		Cbuf_AddText( "cinematic etintro.roq\n" );
+		/*Cvar_Set( "nextmap", "cinematic avlogo.roq" );
+		if( !com_introPlayed->integer ) {
+			Cvar_Set( com_introPlayed->name, "1" );
+			//Cvar_Set( "nextmap", "cinematic avlogo.roq" );
+		}*/
 	}
 
 	com_fullyInitialized = qtrue;

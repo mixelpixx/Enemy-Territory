@@ -1120,6 +1120,29 @@ void R_Register( void ) {
 }
 
 /*
+====================================================================
+ET-RM: jpeg-6 default-error-handler hooks (see src/jpeg-6/jerror.h).
+
+gl1's LoadJPG/SaveJPG (tr_image.c) use jpeg_std_error with no setjmp
+override, so jerror.c's DEFAULT error_exit is live here.  Route it
+back through ri.Error(ERR_FATAL) — clean dialog + CL_Shutdown + gamma
+restore — exactly the pre-decoupling behavior; warnings go to the
+console.  The renderer2 DLL links its own copy of the jpeg-6 static
+lib, so its hooks stay NULL (its setjmp handler covers decode).
+====================================================================
+*/
+extern void ( *jpeg_fatal_error_hook )( const char *msg );
+extern void ( *jpeg_output_message_hook )( const char *msg );
+
+static void R_JpegErrorFatal( const char *msg ) {
+	ri.Error( ERR_FATAL, "%s\n", msg );
+}
+
+static void R_JpegOutputMessage( const char *msg ) {
+	ri.Printf( PRINT_ALL, "%s\n", msg );
+}
+
+/*
 ===============
 R_Init
 ===============
@@ -1129,6 +1152,11 @@ void R_Init( void ) {
 	int i;
 
 	ri.Printf( PRINT_ALL, "----- R_Init -----\n" );
+
+	// ET-RM: route jpeg-6's default fatal/output handlers through the engine
+	// (must be set before any image loading; see comment above).
+	jpeg_fatal_error_hook = R_JpegErrorFatal;
+	jpeg_output_message_hook = R_JpegOutputMessage;
 
 	// clear all our internal state
 	memset( &tr, 0, sizeof( tr ) );
