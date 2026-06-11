@@ -132,6 +132,7 @@ void  BrdgOur_GlconfigCopyBack(
 	const char *renderer, const char *vendor, const char *version, const char *extensions,
 	int maxTextureSize, int maxActiveTextures,
 	int colorBits, int depthBits, int stencilBits,
+	int driverType, int hardwareType, int deviceSupportsGamma, int textureCompression,
 	int vidWidth, int vidHeight, float windowAspect, int displayFrequency,
 	int isFullscreen, void *ourGlconfig);
 

@@ -369,11 +369,25 @@ static long imp_FS_FOpenFileRead(const char *filename, fileHandle_t *file, qbool
 	int   len;
 	(void)uniqueFILE;
 
+	/* PROBE PATH (file == NULL): every vendored caller that passes file==NULL
+	 * (tr_bsp/tr_glsl/tr_image/tr_model/tr_font) uses this purely as an
+	 * existence/length check and never reads through a handle — FS_Read is
+	 * never called in the vendored tree today. Read+free immediately and
+	 * return the length; do NOT occupy a handle slot (the old behavior leaked
+	 * a slot + the whole file buffer per probe, exhausting the 16-slot table
+	 * after 16 probes and making every later asset read as missing). */
+	if (!file)
+	{
+		len = BrdgOur_FS_ReadFile(filename, &buf);
+		if (buf) { BrdgOur_FS_FreeFile(buf); }
+		return (len < 0) ? -1 : len;
+	}
+
 	len = BrdgOur_FS_ReadFile(filename, &buf);
 	if (len < 0 || !buf)
 	{
-		if (file) { *file = 0; }
-		if (buf)  { BrdgOur_FS_FreeFile(buf); }
+		*file = 0;
+		if (buf) { BrdgOur_FS_FreeFile(buf); }
 		return -1;
 	}
 
@@ -703,6 +717,10 @@ static void re_BeginRegistration(void *ourGlconfig)
 		bridgeGlconfig.version_string, bridgeGlconfig.extensions_string,
 		bridgeGlconfig.maxTextureSize, bridgeGlconfig.maxActiveTextures,
 		bridgeGlconfig.colorBits, bridgeGlconfig.depthBits, bridgeGlconfig.stencilBits,
+		/* enum-valued fields pass as int; values align across both glconfig_t
+		 * definitions (classic q3 enums on both sides). */
+		(int)bridgeGlconfig.driverType, (int)bridgeGlconfig.hardwareType,
+		(int)bridgeGlconfig.deviceSupportsGamma, (int)bridgeGlconfig.textureCompression,
 		bridgeGlconfig.vidWidth, bridgeGlconfig.vidHeight, bridgeGlconfig.windowAspect,
 		bridgeGlconfig.displayFrequency, (int)bridgeGlconfig.isFullscreen, ourGlconfig);
 }

@@ -155,9 +155,14 @@ void BrdgOur_CvarSet(const char *name, const char *value)
 
 int BrdgOur_CvarVariableIntegerValue(const char *name)
 {
-	/* our v9 refimport lacks Cvar_VariableIntegerValue; derive it via Cvar_Get
-	 * with a NULL default (Cvar_Get returns the existing cvar unchanged when it
-	 * already exists; for a non-existent name it would create it at "" => 0). */
+	/* ACCEPTED DIVERGENCE: our v9 refimport (src/renderer/tr_public.h) has no
+	 * non-creating cvar query — only Cvar_Get/Cvar_Set. ET:Legacy's real
+	 * Cvar_VariableIntegerValue does NOT create missing cvars; ours, via
+	 * Cvar_Get(name, "", 0), creates a missing cvar at default "" (flags 0)
+	 * and returns integer 0. For an existing cvar, Cvar_Get returns it
+	 * unchanged, so the value read is identical. The side effect is harmless
+	 * for the renderer's queries: same 0 result, and an empty-string cvar
+	 * with no flags has no engine behavior attached. */
 	cvar_t *cv;
 	if (!ri.Cvar_Get)
 	{
@@ -299,6 +304,7 @@ void BrdgOur_GlconfigCopyBack(
 	const char *renderer, const char *vendor, const char *version, const char *extensions,
 	int maxTextureSize, int maxActiveTextures,
 	int colorBits, int depthBits, int stencilBits,
+	int driverType, int hardwareType, int deviceSupportsGamma, int textureCompression,
 	int vidWidth, int vidHeight, float windowAspect, int displayFrequency,
 	int isFullscreen, void *ourGlconfig)
 {
@@ -316,6 +322,15 @@ void BrdgOur_GlconfigCopyBack(
 	gc->colorBits         = colorBits;
 	gc->depthBits         = depthBits;
 	gc->stencilBits       = stencilBits;
+	/* enum-valued fields pass as int through the neutral interface; the enum
+	 * VALUES align between the two worlds (verified against both tr_types.h):
+	 * glDriverType_t GLDRV_ICD/STANDALONE/VOODOO = 0/1/2 in both,
+	 * glHardwareType_t GLHW_GENERIC..PERMEDIA2 = 0..4 in both,
+	 * textureCompression_t TC_NONE/TC_S3TC/TC_S3TC_ARB(=TC_EXT_COMP_S3TC) = 0/1/2. */
+	gc->driverType          = (glDriverType_t)driverType;
+	gc->hardwareType        = (glHardwareType_t)hardwareType;
+	gc->deviceSupportsGamma = deviceSupportsGamma ? qtrue : qfalse;
+	gc->textureCompression  = (textureCompression_t)textureCompression;
 	gc->vidWidth          = vidWidth;
 	gc->vidHeight         = vidHeight;
 	gc->windowAspect      = windowAspect;
