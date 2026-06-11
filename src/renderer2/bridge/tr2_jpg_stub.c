@@ -10,8 +10,10 @@ fails at the source level, so we EXCLUDE tr_image_jpg.c from the etrm_renderer2
 build for this task and supply these stubs providing the same entry points
 (R_LoadJPG / RE_SaveJPG / RE_SaveJPGToBuffer).
 
-R_LoadJPG returns qfalse ("not loaded") the same way the other loaders signal
-failure, so R_LoadImage falls through cleanly.
+R_LoadJPG returns qfalse ("not loaded"). NOTE: their tr_image.c R_LoadImage
+dispatches to a SINGLE loader by file extension (no try-every-loader fallthrough).
+A named-but-unparseable ".jpg" makes their code Ren_Drop (existing-file error),
+so this qfalse surfaces as a missing-image diagnostic. Real JPEG = R2-3.
 
 DELIBERATE R2-3 REVISIT: the main menu is TGA-heavy, so the menu boots without
 JPEG. Real JPEG (world textures, etc.) returns in R2-3 — either by upgrading the

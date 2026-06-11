@@ -2,20 +2,25 @@
 # GLSL / GL 3.3 core), built as a DLL loaded at runtime by the cl_renderer
 # dispatcher (exe-dir only).
 #
-# R2-2 / Task 2 (this file): make the vendored ET:Legacy renderer2 tree COMPILE
-# under MSVC x64 and LINK as etrm_renderer2.dll. The DLL still exports only the
-# R2-1 STUB GetRefAPI (so the dispatcher keeps falling back to gl1); the real
-# bridge that wires their GetRefAPI to our engine lands in Task 3.
+# R2-2 / Task 3 (this file): the BRIDGE wires our engine (REF_API_VERSION 9) to
+# the vendored ET:Legacy renderer2 (their v10 interface). The DLL now exports the
+# bridge's GetRefAPI (no longer the R2-1 stub). Include isolation: the two header
+# worlds (ours / theirs) define identically-named types, so the bridge is split
+# into per-world TUs that never include each other's headers, joined by a neutral
+# contract (bridge/tr2_bridge.h, primitive types only).
 #
 # Composition:
 #   * shdr2h            — host tool that embeds the GLSL shaders into shaders.h
 #   * etrm_glew         — vendored GLEW (static, GLEW_STATIC), GL entry points
 #   * etrm_zlib         — zlib (FetchContent, pinned) for tr_public.h + zlib_*
 #   * etrm_renderer2_core (STATIC) — ALL vendored renderer2 + renderercommon .c
-#                          (minus tr_image_png.c / tr_image_jpg.c, which are
-#                          excluded and stubbed — see bridge/tr2_*_stub.c)
-#   * etrm_renderer2    (SHARED) — tr2_stub.c (the .def-exported GetRefAPI)
-#                          linking the core lib.
+#                          (minus tr_image_png.c / tr_image_jpg.c, excluded+stubbed)
+#                          + the THEIRS-side bridge TUs (their header world):
+#                          tr2_bridge_theirs.c, tr2_layout_theirs.c,
+#                          tr2_engine_stubs.c, tr2_png_stub.c, tr2_jpg_stub.c.
+#   * etrm_renderer2    (SHARED) — the OURS-side bridge TUs (our header world):
+#                          tr2_bridge_ours.c (exported GetRefAPI), tr2_layout_ours.c,
+#                          tr2_layout_check.c (neutral) — linking the core lib.
 #
 # EDIT-RULE NOTE: their tr_init.c defines GetRefAPI, which would collide with the
 # stub's exported GetRefAPI. We rename THEIRS to ETL_GetRefAPI via a per-file
@@ -123,13 +128,25 @@ set(R2_QSHARED_SRC
     "${R2_DIR}/etlsrc/qcommon/q_math.c"
     "${R2_DIR}/etlsrc/qcommon/q_shared.c")
 
+# Bridge TUs that see THEIR header world (etlhdr/) live in the CORE lib so they
+# compile with the vendored include dirs + defines (FEATURE_RENDERER2 etc.).
+# Include isolation: these must NEVER see our src/renderer or src/cgame headers.
+#   tr2_bridge_theirs.c — their refimport build + refexport wrap + cvar proxies
+#   tr2_layout_theirs.c — their-world layout table
+#   tr2_engine_stubs.c  — Com_Printf/Error/DPrintf/BlockChecksum (their q_shared)
+#   tr2_png_stub.c / tr2_jpg_stub.c — image-loader stubs (their tr_common/tr_local)
+set(R2_BRIDGE_THEIRS_SRC
+    "${R2_DIR}/bridge/tr2_bridge_theirs.c"
+    "${R2_DIR}/bridge/tr2_layout_theirs.c"
+    "${R2_DIR}/bridge/tr2_engine_stubs.c"
+    "${R2_DIR}/bridge/tr2_png_stub.c"
+    "${R2_DIR}/bridge/tr2_jpg_stub.c")
+
 set(R2_CORE_SRC
     ${R2_ETL_SRC}
     ${R2_COMMON_SRC}
     ${R2_QSHARED_SRC}
-    "${R2_DIR}/bridge/tr2_png_stub.c"
-    "${R2_DIR}/bridge/tr2_jpg_stub.c"
-    "${R2_DIR}/bridge/tr2_engine_stubs.c")
+    ${R2_BRIDGE_THEIRS_SRC})
 
 # ----------------------------------------------------------------------------
 #  Include-dir resolution for the vendored tree.
@@ -150,7 +167,8 @@ set(R2_INCLUDE_DIRS
     "${R2_HDR}/qcommon"
     "${R2_HDR}/renderercommon"
     "${R2_HDR}/game"
-    "${R2_GEN}")
+    "${R2_GEN}"
+    "${R2_DIR}/bridge")   # neutral tr2_bridge.h (theirs-side bridge TUs)
 
 set(R2_DEFINES
     FEATURE_RENDERER2
@@ -201,16 +219,24 @@ if(MSVC)
 endif()
 
 # ----------------------------------------------------------------------------
-#  etrm_renderer2 — the DLL. Still the R2-1 stub GetRefAPI (via the .def); the
-#  bridge replaces tr2_stub.c with tr2_bridge.c in Task 3.
+#  etrm_renderer2 — the DLL. The R2-1 stub (tr2_stub.c) is REPLACED by the
+#  bridge's OURS-side TUs, which see only OUR engine headers (include isolation;
+#  the THEIRS-side TUs live in the core lib above). The DLL still exports only
+#  GetRefAPI (now the bridge's), via renderer2.def.
+#    tr2_bridge_ours.c   — exported GetRefAPI, BrdgOur_* callbacks, our refexport
+#    tr2_layout_ours.c   — our-world layout table
+#    tr2_layout_check.c  — neutral checker (only tr2_bridge.h; no header world)
 # ----------------------------------------------------------------------------
 add_library(etrm_renderer2 SHARED
-    "${R2_DIR}/tr2_stub.c")
+    "${R2_DIR}/bridge/tr2_bridge_ours.c"
+    "${R2_DIR}/bridge/tr2_layout_ours.c"
+    "${R2_DIR}/bridge/tr2_layout_check.c")
 
 target_include_directories(etrm_renderer2 PRIVATE
     ${ETRM_SRC}/renderer
     ${ETRM_SRC}/qcommon
-    ${ETRM_SRC}/game)
+    ${ETRM_SRC}/game
+    "${R2_DIR}/bridge")
 
 # Pull in the whole vendored archive. /WHOLEARCHIVE keeps their GetRefAPI (now
 # ETL_GetRefAPI) and all RE_* entry points alive in the DLL for Task 3 even

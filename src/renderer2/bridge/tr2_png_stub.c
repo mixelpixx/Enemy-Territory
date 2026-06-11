@@ -11,9 +11,12 @@ inflate path, we EXCLUDE tr_image_png.c from the etrm_renderer2 build and supply
 these stubs providing the same entry points (R_LoadPNG / RE_SavePNG) so the rest
 of the tree links.
 
-R_LoadPNG signals "not loaded" exactly the way the other image loaders signal
-failure: it returns qfalse without touching *pic. Callers (R_LoadImage in
-tr_image.c) then fall through to the next loader / report a missing image.
+R_LoadPNG signals "not loaded" by returning qfalse without touching *pic. NOTE:
+in their tr_image.c, R_LoadImage dispatches to a SINGLE loader chosen by the
+file extension (it does not try every loader in turn). When a ".png" is named
+but cannot be decoded, their code Ren_Drop's (an existing-but-unparseable file
+is treated as an error), so a returned qfalse here surfaces as a missing-image
+diagnostic rather than a silent fallthrough. Real PNG support = R2-3.
 
 DELIBERATE R2-3 REVISIT: retail ET assets are TGA/JPG; the main menu does not
 require PNG. Real PNG support returns in R2-3 (either by vendoring puff.c behind

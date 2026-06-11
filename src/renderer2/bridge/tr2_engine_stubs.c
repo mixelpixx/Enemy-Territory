@@ -1,92 +1,82 @@
 /*
 ===========================================================================
-ET-RM renderer2 — bridge-precursor engine stubs (R2-2 / Task 2).
+ET-RM renderer2 — bridge engine glue (R2-2 / Task 3).
 
 The vendored renderer2 tree (and the vendored q_shared.c parser/string layer it
-links against) calls a handful of ENGINE functions that, in ET:Legacy's build,
-the engine provides and that, in OUR build, the bridge will route through the
-refimport `ri` struct in Task 3:
+links against) calls a handful of ENGINE functions that ET:Legacy's engine
+provides. In OUR build these are routed through the bridge to our engine's
+refimport `ri`:
 
-    Com_Printf / Com_DPrintf  -> ri.Printf
-    Com_Error                 -> ri.Error
-    Com_BlockChecksum         -> ri.zlib_crc32 (or a real CRC) once the bridge exists
+    Com_Printf        -> BrdgOur_Print(PRINT_ALL,  ...)   -> ri.Printf
+    Com_DPrintf       -> BrdgOur_Print(PRINT_DEVELOPER,...)-> ri.Printf
+    Com_Error         -> BrdgOur_Error(...)               -> ri.Error (noreturn)
+    Com_BlockChecksum -> zlib crc32 (zlib is linked)
 
-For Task 2 the goal is only that etrm_renderer2.dll LINKS. These are minimal,
-SELF-CONTAINED, LOGGED precursor implementations so no engine .c is dragged in:
-the print paths go to stderr, Com_Error aborts loudly, and Com_BlockChecksum
-runs a small standalone CRC so callers (GLSL_GenerateCheckSum, shader caching)
-get a stable value. Task 3's tr2_bridge.c REPLACES this TU entirely by wiring
-these to `ri`.
+This TU lives in the vendored CORE static lib (so the vendored code resolves
+these symbols), but the BrdgOur_* shims it calls are defined in the bridge's
+ours-TU (tr2_bridge_ours.c) — both are linked into the same etrm_renderer2.dll,
+so the call resolves at link time. Before the bridge stores `ri` (i.e. between
+DLL load and GetRefAPI), BrdgOur_* are safe no-ops (they guard on g_haveRI).
 
 GPLv3 (ET-RM original glue; no third-party code).
 ===========================================================================
 */
 
-#include "q_shared.h"
+#include "q_shared.h"          /* their QDECL, Q_vsnprintf, PRINT_* values */
 
-#include <stdio.h>
-#include <stdlib.h>
+#include "zlib.h"
+
 #include <stdarg.h>
 
+#include "tr2_bridge.h"        /* BrdgOur_Print / BrdgOur_Error (neutral) */
+
 /**
- * @brief Com_Printf precursor — forwards to stderr until the bridge wires ri.Printf.
+ * @brief Com_Printf — routed to ri.Printf(PRINT_ALL, ...) via the bridge.
  */
 void QDECL Com_Printf(const char *fmt, ...)
 {
-	va_list argptr;
-	va_start(argptr, fmt);
-	vfprintf(stderr, fmt, argptr);
-	va_end(argptr);
+	char    buf[MAX_PRINT_MSG];
+	va_list ap;
+	va_start(ap, fmt);
+	Q_vsnprintf(buf, sizeof(buf), fmt, ap);
+	va_end(ap);
+	BrdgOur_Print(PRINT_ALL, buf);
 }
 
 /**
- * @brief Com_DPrintf precursor — developer print to stderr until the bridge wires ri.Printf.
+ * @brief Com_DPrintf — routed to ri.Printf(PRINT_DEVELOPER, ...) via the bridge.
  */
 void QDECL Com_DPrintf(const char *fmt, ...)
 {
-	va_list argptr;
-	va_start(argptr, fmt);
-	vfprintf(stderr, fmt, argptr);
-	va_end(argptr);
+	char    buf[MAX_PRINT_MSG];
+	va_list ap;
+	va_start(ap, fmt);
+	Q_vsnprintf(buf, sizeof(buf), fmt, ap);
+	va_end(ap);
+	BrdgOur_Print(PRINT_DEVELOPER, buf);
 }
 
 /**
- * @brief Com_Error precursor — loud abort until the bridge wires ri.Error.
+ * @brief Com_Error — routed to ri.Error via the bridge (noreturn on the engine).
  */
 void QDECL Com_Error(int code, const char *fmt, ...)
 {
-	va_list argptr;
-	(void)code;
-
-	fprintf(stderr, "renderer2 Com_Error (pre-bridge): ");
-	va_start(argptr, fmt);
-	vfprintf(stderr, fmt, argptr);
-	va_end(argptr);
-	fprintf(stderr, "\n");
-
-	abort();
+	char    buf[MAX_PRINT_MSG];
+	va_list ap;
+	va_start(ap, fmt);
+	Q_vsnprintf(buf, sizeof(buf), fmt, ap);
+	va_end(ap);
+	BrdgOur_Error(code, buf);
+	for (;;) { }   /* unreachable: ri.Error is noreturn */
 }
 
 /**
- * @brief Com_BlockChecksum precursor — standalone CRC-32 (IEEE) so shader-cache
- *        checksums are stable. Replaced by ri-routed crc32 in Task 3.
+ * @brief Com_BlockChecksum — CRC-32 (IEEE) via the linked zlib, so shader-cache
+ *        checksums (GLSL_GenerateCheckSum) are stable and standard.
  */
 unsigned int Com_BlockChecksum(const void *buffer, size_t length)
 {
-	const unsigned char *p = (const unsigned char *)buffer;
-	unsigned int         crc = 0xFFFFFFFFu;
-	size_t               i;
-	int                  k;
-
-	for (i = 0; i < length; ++i)
-	{
-		crc ^= p[i];
-		for (k = 0; k < 8; ++k)
-		{
-			unsigned int mask = (unsigned int)(-(int)(crc & 1u));
-			crc = (crc >> 1) ^ (0xEDB88320u & mask);
-		}
-	}
-
-	return ~crc;
+	uLong crc = crc32(0L, Z_NULL, 0);
+	crc = crc32(crc, (const Bytef *)buffer, (uInt)length);
+	return (unsigned int)crc;
 }
