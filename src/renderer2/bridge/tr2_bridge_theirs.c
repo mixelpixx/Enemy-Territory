@@ -328,6 +328,11 @@ static void imp_Cmd_ExecuteText(int exec_when, const char *text)
  *  Their vec3_t is float[3] (decays to const float*) and clipHandle_t is int,
  *  so the neutral primitive signature re-types without conversion.
  *
+ *  NOTE: their tr_bsp.c callers compare the result with == CONTENTS_SOLID
+ *  (exact equality, not a & mask), so multi-content solid brushes read as
+ *  non-solid. That is upstream ET:Legacy behavior — kept for parity; keep it
+ *  in mind before blaming this passthrough for an A/B lighting discrepancy.
+ *
  *  CM_DrawDebugSurface IS on our ri (it always was — the old no-op comment
  *  claiming otherwise was wrong); the drawPoly callback signature is identical
  *  primitive types in both worlds, so the fn-ptr forwards verbatim.
@@ -345,7 +350,7 @@ static void imp_CM_DrawDebugSurface(void (*drawPoly)(int color, int numPoints, f
 
 /* ======================================================================== *
  *  refimport: filesystem
- *  PASSTHROUGH for the members our v9 ri has; the streaming trio
+ *  PASSTHROUGH for the members our ri has; the streaming trio
  *  (FS_FOpenFileRead/FS_Read) our ri LACKS -> REAL adapters over FS_ReadFile:
  *  open reads the whole file into a bridge handle slot; Read memcpys from the
  *  offset; close frees. Bounded (a small handle table) and correct for the

@@ -2,7 +2,7 @@
 ===========================================================================
 ET-RM renderer2 — BRIDGE, OURS-side translation unit (R2-2 / Task 3).
 
-Includes ONLY our engine headers (refimport_t/refexport_t v9, glimpParams_t,
+Includes ONLY our engine headers (refimport_t/refexport_t v10, glimpParams_t,
 tr_types.h, q_shared.h). Responsibilities:
 
   1. Export GetRefAPI(int apiVersion, refimport_t *ourRI) — the DLL's sole
@@ -12,7 +12,7 @@ tr_types.h, q_shared.h). Responsibilities:
   2. Implement the BrdgOur_* neutral callbacks the theirs-TU uses to reach our
      engine services (it cannot see our refimport_t).
   3. Assemble OUR refexport_t from the neutral brdgReExport_t table the
-     theirs-TU published, wrapping each member back into our v9 shapes.
+     theirs-TU published, wrapping each member back into our v10 shapes.
      Members our struct has but theirs lacks (SaveViewParms / RestoreViewParms)
      are filled with logged-once no-ops here.
 
@@ -24,7 +24,7 @@ GPLv3 (ET-RM original glue; no third-party code).
 */
 
 #include "../../game/q_shared.h"     /* qboolean/vec types, PRINT_*, ha_pref */
-#include "../../renderer/tr_public.h" /* OUR refimport_t/refexport_t v9, glimpParams_t */
+#include "../../renderer/tr_public.h" /* OUR refimport_t/refexport_t v10, glimpParams_t */
 
 #include "tr2_bridge.h"
 
@@ -80,8 +80,8 @@ static void Brdg_strncpyz(char *dst, const char *src, size_t size)
 /* ------------------------------------------------------------------------ *
  *  Our-side state.
  * ------------------------------------------------------------------------ */
-static refimport_t ri;          /* the engine's v9 refimport (copied by value) */
-static refexport_t re;          /* the v9 refexport we hand back to the engine */
+static refimport_t ri;          /* the engine's v10 refimport (copied by value) */
+static refexport_t re;          /* the v10 refexport we hand back to the engine */
 static qboolean    g_haveRI = qfalse;
 
 /* one-shot logging helper for stub paths */
@@ -182,7 +182,7 @@ void BrdgOur_CvarSet(const char *name, const char *value)
 
 int BrdgOur_CvarVariableIntegerValue(const char *name)
 {
-	/* ACCEPTED DIVERGENCE: our v9 refimport (src/renderer/tr_public.h) has no
+	/* ACCEPTED DIVERGENCE: our refimport (src/renderer/tr_public.h) has no
 	 * non-creating cvar query — only Cvar_Get/Cvar_Set. ET:Legacy's real
 	 * Cvar_VariableIntegerValue does NOT create missing cvars; ours, via
 	 * Cvar_Get(name, "", 0), creates a missing cvar at default "" (flags 0)
@@ -379,7 +379,7 @@ void BrdgOur_GlconfigCopyBack(
 }
 
 /* ======================================================================== *
- *  OUR refexport_t assembly — wrap the neutral table back into v9 shapes.
+ *  OUR refexport_t assembly — wrap the neutral table back into v10 shapes.
  *
  *  Most members are 1:1 (the wrapper just forwards; engine struct pointers are
  *  passed straight through as void*). The few that drift are translated inside
@@ -422,7 +422,7 @@ static void RE_RestoreViewParms_stub(void)
 	             "(renderer2 rebuilds tr.viewParms per scene; proven harmless, R2-3)\n");
 }
 
-/* ---- thin forwarders (our v9 signatures -> neutral table) --------------- */
+/* ---- thin forwarders (our v10 signatures -> neutral table) -------------- */
 
 static void w_Shutdown(qboolean destroyWindow)            { X->Shutdown((int)destroyWindow); }
 static void w_BeginRegistration(glconfig_t *config)       { X->BeginRegistration((void *)config); }
