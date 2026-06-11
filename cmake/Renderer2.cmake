@@ -248,3 +248,22 @@ set_target_properties(etrm_renderer2 PROPERTIES
     LINK_FLAGS "/DEF:\"${R2_DIR}/renderer2.def\" /WHOLEARCHIVE:etrm_renderer2_core")
 
 etrm_apply_common_definitions(etrm_renderer2)
+
+# ----------------------------------------------------------------------------
+#  etrm_r2bind — bind harness (Task 3 exit-bar evidence + regression test).
+#
+#  Stands in for the engine's CL_InitRef dlopen path when retail assets are
+#  absent: LoadLibrary etrm_renderer2.dll, resolve GetRefAPI, call it with a
+#  mock refimport, assert a non-NULL populated refexport comes back (= layout
+#  check passed + the boundary is wired). No GL context (that is Task 4).
+# ----------------------------------------------------------------------------
+add_executable(etrm_r2bind "${R2_DIR}/bridge/tr2_bind_harness.c")
+add_dependencies(etrm_r2bind etrm_renderer2)
+set_target_properties(etrm_r2bind PROPERTIES FOLDER "renderer2/tools")
+if(MSVC)
+    target_compile_definitions(etrm_r2bind PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+
+add_test(NAME r2_bridge_bind
+    COMMAND etrm_r2bind "$<TARGET_FILE:etrm_renderer2>"
+    WORKING_DIRECTORY "$<TARGET_FILE_DIR:etrm_renderer2>")
