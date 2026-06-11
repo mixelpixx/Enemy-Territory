@@ -48,6 +48,11 @@ If you have questions concerning this license or the applicable additional terms
 
 #define MIN_DEDICATED_COMHUNKMEGS 1
 #define MIN_COMHUNKMEGS 42 // JPW NERVE changed this to 42 for MP, was 56 for team arena and 75 for wolfSP
+// RM (R2-2 Task 4): floor for the gl2 renderer (ET:Legacy renderer2). Its
+// permanent backEndData_t (~50 MB) + R_Init's 16 MB temp block + image/font/
+// world headroom blow past the 56 MB gl1 default. ET:Legacy itself ships a
+// 256 MB hunk; 192 MB leaves comfortable room for menu + later map loads.
+#define MIN_COMHUNKMEGS_GL2 192
 #define DEF_COMHUNKMEGS "56" // RF, increased this, some maps are exceeding 56mb // JPW NERVE changed this for multiplayer back to 42, 56 for depot/mp_cpdepot, 42 for everything else
 #define DEF_COMZONEMEGS "24" // RF, increased this from 16, to account for botlib/AAS
 
@@ -1590,6 +1595,21 @@ void Com_InitHunkMemory( void ) {
 	} else {
 		nMinAlloc = MIN_COMHUNKMEGS;
 		pMsg = "Minimum com_hunkMegs is %i, allocating %i megs.\n";
+
+		// RM (R2-2 Task 4): the gl2 renderer (vendored ET:Legacy renderer2) makes
+		// much larger PERMANENT hunk allocations than gl1 — its backEndData_t alone
+		// is ~50 MB, and R_Init then needs a ~16 MB temp block on top. The stock
+		// 56 MB default leaves too little headroom and Hunk_AllocateTempMemory
+		// fails mid-init. Raise the floor to MIN_COMHUNKMEGS_GL2 only when
+		// cl_renderer == "gl2" (cvars from the command line / config are already
+		// parsed at this point). The gl1 default path is untouched — same 56 MB.
+		{
+			cvar_t *clRenderer = Cvar_Get( "cl_renderer", "gl1", CVAR_ARCHIVE | CVAR_LATCH );
+			if ( clRenderer && !Q_stricmp( clRenderer->string, "gl2" ) && nMinAlloc < MIN_COMHUNKMEGS_GL2 ) {
+				nMinAlloc = MIN_COMHUNKMEGS_GL2;
+				pMsg = "Minimum com_hunkMegs for cl_renderer gl2 is %i, allocating %i megs.\n";
+			}
+		}
 	}
 
 	if ( cv->integer < nMinAlloc ) {
@@ -2988,13 +3008,24 @@ void Com_Init( char *commandLine ) {
 	Cvar_Set( "com_recommendedSet", "1" );
 
 	if ( !com_dedicated->integer ) {
-		//Cvar_Set( "com_logosPlaying", "1" );
-		Cbuf_AddText( "cinematic etintro.roq\n" );
-		/*Cvar_Set( "nextmap", "cinematic avlogo.roq" );
-		if( !com_introPlayed->integer ) {
-			Cvar_Set( com_introPlayed->name, "1" );
-			//Cvar_Set( "nextmap", "cinematic avlogo.roq" );
-		}*/
+		// RM (R2-2 Task 4): the intro RoQ (DrawStretchRaw/UploadCinematic path)
+		// crashes under the gl2 renderer (vendored ET:Legacy renderer2) during
+		// cinematic setup. Per the R2-2 plan this is an acceptable, logged
+		// descope for the boot-to-menu increment — the cinematic path returns in
+		// R2-3. Under gl1 the intro plays exactly as before (byte-identical).
+		cvar_t *clRenderer = Cvar_Get( "cl_renderer", "gl1", CVAR_ARCHIVE | CVAR_LATCH );
+		if ( clRenderer && !Q_stricmp( clRenderer->string, "gl2" ) ) {
+			Com_Printf( S_COLOR_YELLOW "gl2: skipping intro cinematic (etintro.roq) — "
+			            "RoQ/DrawStretchRaw path descoped to R2-3\n" );
+		} else {
+			//Cvar_Set( "com_logosPlaying", "1" );
+			Cbuf_AddText( "cinematic etintro.roq\n" );
+			/*Cvar_Set( "nextmap", "cinematic avlogo.roq" );
+			if( !com_introPlayed->integer ) {
+				Cvar_Set( com_introPlayed->name, "1" );
+				//Cvar_Set( "nextmap", "cinematic avlogo.roq" );
+			}*/
+		}
 	}
 
 	com_fullyInitialized = qtrue;
