@@ -20,7 +20,14 @@
 #include "jpeglib.h"
 #include "jmemsys.h"     /* import the system-dependent declarations */
 
-#include "../renderer/tr_local.h"
+/* ET-RM R2-3 T3 (MECHANICAL vendored edit): the id-Software customization routed
+ * jpeg-6b's small/large allocations through the gl1 renderer's global
+ * `refimport_t ri` (../renderer/tr_local.h).  Under the renderer2 DLL that `ri`
+ * is a different, never-populated symbol (the bridge owns its own static ri), so
+ * `ri.Z_Malloc` was NULL/garbage -> the FIRST real JPEG decode (world textures)
+ * faulted in jinit_memory_mgr.  Reverting jmemnobs.c to STOCK jpeg-6b behavior
+ * (plain malloc/free) decouples the decoder from any renderer's refimport. */
+#include <stdlib.h>
 
 /*
  * Memory allocation and ri.Freeing are controlled by the regular library
@@ -29,12 +36,12 @@
 
 GLOBAL void *
 jpeg_get_small( j_common_ptr cinfo, size_t sizeofobject ) {
-	return (void *) ri.Z_Malloc( sizeofobject );
+	return (void *) malloc( sizeofobject );
 }
 
 GLOBAL void
 jpeg_free_small( j_common_ptr cinfo, void * object, size_t sizeofobject ) {
-	ri.Free( object );
+	free( object );
 }
 
 
@@ -47,12 +54,12 @@ jpeg_free_small( j_common_ptr cinfo, void * object, size_t sizeofobject ) {
 
 GLOBAL void FAR *
 jpeg_get_large( j_common_ptr cinfo, size_t sizeofobject ) {
-	return (void FAR *) ri.Z_Malloc( sizeofobject );
+	return (void FAR *) malloc( sizeofobject );
 }
 
 GLOBAL void
 jpeg_free_large( j_common_ptr cinfo, void FAR * object, size_t sizeofobject ) {
-	ri.Free( object );
+	free( object );
 }
 
 
