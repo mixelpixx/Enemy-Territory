@@ -375,20 +375,38 @@ void BrdgOur_GlconfigCopyBack(
 
 static const brdgReExport_t *X;     /* the theirs-TU published table */
 
-/* ---- members theirs lacks: logged-once no-ops --------------------------- */
+/* ---- members theirs lacks: deliberate no-ops (proven harmless) ----------
+ * The vanilla (gl1) RE_SaveViewParms/RE_RestoreViewParms saved tr.viewParms
+ * around a second RenderScene (the HUD player-head preview drawn every frame,
+ * and the limbo class/head previews) so the vanilla LOD system wouldn't read a
+ * stale viewParms left behind by that sub-render.
+ *
+ * renderer2 has no such cross-scene hazard: R_RenderView() does an
+ * unconditional `tr.viewParms = *parms;` at entry (etl/tr_main.c), rebuilding
+ * tr.viewParms from each scene's refdef. The HUD-head sub-RenderScene's
+ * viewParms is therefore fully overwritten by the next world RenderScene before
+ * any culling/LOD uses it — nothing carries over. (renderer2 DOES save/restore
+ * tr.viewParms internally for portals/mirrors in R_MirrorView, but that is a
+ * self-contained intra-frame operation, unrelated to these engine entry points.)
+ *
+ * R2-3 Task 4 evidence: instrumented these stubs and confirmed the cgame HUD
+ * head fires them every frame in stock gameplay (oasis, axis soldier, alive),
+ * while the gl2 world rendered correctly throughout — i.e. the no-op is
+ * provably benign. Verdict: keep as no-ops. The logged-once notice is retained
+ * (DEVELOPER level) as documentation, not a warning of breakage. */
 static qboolean g_warnedSaveView;
 static void RE_SaveViewParms_stub(void)
 {
 	Brdg_LogOnce(&g_warnedSaveView,
-	             "renderer2 bridge: SaveViewParms is not implemented in renderer2 "
-	             "(no-op; revisit for R2-3 parity)\n");
+	             "renderer2 bridge: SaveViewParms is a deliberate no-op "
+	             "(renderer2 rebuilds tr.viewParms per scene; proven harmless, R2-3)\n");
 }
 static qboolean g_warnedRestoreView;
 static void RE_RestoreViewParms_stub(void)
 {
 	Brdg_LogOnce(&g_warnedRestoreView,
-	             "renderer2 bridge: RestoreViewParms is not implemented in renderer2 "
-	             "(no-op; revisit for R2-3 parity)\n");
+	             "renderer2 bridge: RestoreViewParms is a deliberate no-op "
+	             "(renderer2 rebuilds tr.viewParms per scene; proven harmless, R2-3)\n");
 }
 
 /* ---- thin forwarders (our v9 signatures -> neutral table) --------------- */

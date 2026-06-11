@@ -3010,7 +3010,15 @@ void GLSL_SetUniform_ColorModulate(programInfo_t *prog, int colorGen, int alphaG
 		break;
 	}
 
-	if ((prog->attributes & ATTR_COLOR) && !(glState.vertexAttribsState & ATTR_COLOR))
+	// RM (vendored mechanical, R2-3 Task 4): guard the currentVBO deref to match
+	// the identical NULL-VBO guard the upstream authors already placed in
+	// GLSL_VertexAttribPointers() (see "no current VBO bound" below). Without it,
+	// this dereferences glState.currentVBO (== NULL) and faults when ColorModulate
+	// runs before any VBO is bound — e.g. RE_StretchRaw on the very first 2D draw
+	// (the intro RoQ cinematic at boot). When currentVBO is NULL we skip the early
+	// pointer setup; the subsequent Tess_UpdateVBOs -> R_BindVBO + GLSL_VertexAttribsState
+	// re-establishes the ATTR_COLOR pointer from the freshly-bound tess.vbo.
+	if ((prog->attributes & ATTR_COLOR) && !(glState.vertexAttribsState & ATTR_COLOR) && glState.currentVBO)
 	{
 		glEnableVertexAttribArray(ATTR_INDEX_COLOR);
 		glState.vertexAttribsState |= ATTR_COLOR;
