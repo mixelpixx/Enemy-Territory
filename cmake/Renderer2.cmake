@@ -113,11 +113,11 @@ set_target_properties(etrm_r2_shaders PROPERTIES FOLDER "renderer2/tools")
 # ----------------------------------------------------------------------------
 file(GLOB R2_ETL_SRC    "${R2_ETL}/*.c")
 file(GLOB R2_COMMON_SRC "${R2_COMMON}/*.c")
-# tr_image_jpg.c is now BUILT (R2-3 / Task 1): real JPEG decode via the
-# jpeg-6b mem-src shim (bridge/tr2_jpeg_compat.c). Only tr_image_png.c stays
-# excluded until Task 2 vendors puff.c.
-list(REMOVE_ITEM R2_COMMON_SRC
-    "${R2_COMMON}/tr_image_png.c")
+# Both image loaders are now BUILT:
+#  * tr_image_jpg.c (R2-3 T1) — real JPEG decode via the jpeg-6b mem-src shim
+#    (bridge/tr2_jpeg_compat.c).
+#  * tr_image_png.c (R2-3 T2) — real PNG decode via vendored puff.c (below).
+# Nothing excluded from the renderercommon loader set anymore.
 
 # ET:Legacy's shared q_math.c / q_shared.c — the math (vec3/mat4/quat/Matrix*/
 # color tables) and parser/string utilities (COM_Parse*, Q_str*, va, Info_*)
@@ -128,7 +128,12 @@ list(REMOVE_ITEM R2_COMMON_SRC
 # supplies in Task 3 (precursor stubs in bridge/tr2_engine_stubs.c for now).
 set(R2_QSHARED_SRC
     "${R2_DIR}/etlsrc/qcommon/q_math.c"
-    "${R2_DIR}/etlsrc/qcommon/q_shared.c")
+    "${R2_DIR}/etlsrc/qcommon/q_shared.c"
+    # R2-3 T2: ET:Legacy's tiny standalone inflate (Mark Adler's puff), vendored
+    # verbatim from the reference clone. tr_image_png.c includes "../qcommon/puff.h"
+    # (already in etlhdr) and calls puff(); this closes that link in the DLL
+    # instead of dragging the engine's puff.c across the bridge.
+    "${R2_DIR}/etlsrc/qcommon/puff.c")
 
 # Bridge TUs that see THEIR header world (etlhdr/) live in the CORE lib so they
 # compile with the vendored include dirs + defines (FEATURE_RENDERER2 etc.).
@@ -136,13 +141,11 @@ set(R2_QSHARED_SRC
 #   tr2_bridge_theirs.c — their refimport build + refexport wrap + cvar proxies
 #   tr2_layout_theirs.c — their-world layout table
 #   tr2_engine_stubs.c  — Com_Printf/Error/DPrintf/BlockChecksum (their q_shared)
-#   tr2_png_stub.c — PNG-loader stub (their tr_common); removed in Task 2
 #   tr2_jpeg_compat.c — jpeg-6b mem-src shim feeding the real tr_image_jpg.c
 set(R2_BRIDGE_THEIRS_SRC
     "${R2_DIR}/bridge/tr2_bridge_theirs.c"
     "${R2_DIR}/bridge/tr2_layout_theirs.c"
     "${R2_DIR}/bridge/tr2_engine_stubs.c"
-    "${R2_DIR}/bridge/tr2_png_stub.c"
     "${R2_DIR}/bridge/tr2_jpeg_compat.c")
 
 set(R2_CORE_SRC
