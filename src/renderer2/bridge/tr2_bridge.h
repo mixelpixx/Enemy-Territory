@@ -5,7 +5,7 @@ ET-RM renderer2 — BRIDGE neutral cross-TU contract (R2-2 / Task 3).
 THE INCLUDE-ISOLATION PROBLEM
 -----------------------------
 The bridge must speak BOTH header worlds:
-  * OURS   — src/renderer/tr_public.h (refimport_t/refexport_t v9, glimpParams_t),
+  * OURS   — src/renderer/tr_public.h (refimport_t/refexport_t v10, glimpParams_t),
              src/cgame/tr_types.h, src/game/q_shared.h.
   * THEIRS — src/renderer2/etlhdr/renderercommon/tr_public.h (v10) + their
              q_shared.h subset.
@@ -114,7 +114,7 @@ int   BrdgOur_CmdArgc(void);
 char *BrdgOur_CmdArgv(int i);
 void  BrdgOur_CmdExecuteText(int execWhen, const char *text);
 
-/* filesystem (our v9 refimport) */
+/* filesystem (our v10 refimport) */
 int   BrdgOur_FS_FileIsInPAK(const char *name, int *pChecksum);
 int   BrdgOur_FS_ReadFile(const char *name, void **buf);
 void  BrdgOur_FS_FreeFile(void *buf);
@@ -162,7 +162,7 @@ void *BrdgOur_GL_GetProcAddress(const char *name);
  *  struct pointers are passed as void* (pass-through types) or already
  *  translated inside the wrapper (drifted types).
  *
- *  Naming mirrors OUR refexport_t member set (the v9 shape the engine expects).
+ *  Naming mirrors OUR refexport_t member set (the v10 shape the engine expects).
  *  Members our struct has but theirs lacks (SaveViewParms/RestoreViewParms) are
  *  filled by the ours-TU with logged-once no-ops and are NOT in this table.
  * ------------------------------------------------------------------------ */
