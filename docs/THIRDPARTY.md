@@ -48,9 +48,15 @@ which RM files, and the license consequence.
 | 2026-06-10 | src/renderer2/etl/common/** | ET:Legacy v2.84.0 @ 764ffc00a953e59aaf435272d004c49a89710309 src/renderercommon/* | GPL-3.0 | verbatim | vendored into src/renderer2/ (etl/, etl/common/, glsl/, header closure) — renderercommon (tr_common, image loaders, font); tr_common_vulkan.c/tr_image_svg.c do not exist at this pin |
 | 2026-06-10 | src/renderer2/glsl/**, src/renderer2/gldef/default.gldef | ET:Legacy v2.84.0 @ 764ffc00a953e59aaf435272d004c49a89710309 src/renderer2/glsl/** + gldef/default.gldef | GPL-3.0 | verbatim | vendored into src/renderer2/ (etl/, etl/common/, glsl/, header closure) — GLSL shaders + shdr/ (shaders2h host tool) + default.gldef |
 | 2026-06-10 | src/renderer2/etlhdr/** | ET:Legacy v2.84.0 @ 764ffc00a953e59aaf435272d004c49a89710309 src/qcommon/, src/game/, src/renderercommon/ headers | GPL-3.0 | verbatim | vendored into src/renderer2/ (etl/, etl/common/, glsl/, header closure) — private header closure (10 qcommon + surfaceflags.h + 3 renderercommon duplicates for `../renderercommon/` include shape); headers only, no engine .c |
+| 2026-06-10 | src/renderer2/etlsrc/qcommon/q_math.c, q_shared.c | ET:Legacy v2.84.0 @ 764ffc00a953e59aaf435272d004c49a89710309 src/qcommon/q_math.c, q_shared.c | GPL-3.0 | verbatim | R2-2 Task 2 — the shared math (vec3/mat4/quat/Matrix*/color tables) and parser/string utilities (COM_Parse*, Q_str*, va, Info_*) the renderer tree links against; compiled into etrm_renderer2.dll. No source edits (C_ONLY compile-def selects the portable-C BoxOnPlaneSide path) |
+| 2026-06-10 | vendor/tinydir.h | ET:Legacy v2.84.0 vendor/tinydir.h (tinydir authors, 2013-2016) | BSD-2-Clause | verbatim | R2-2 Task 2 — single-header dir-iteration helper required by the shdr2h host tool (`#include "../../../../vendor/tinydir.h"`); vendored at the upstream-relative path so the existing include resolves with no source edit. BSD-2-Clause is GPLv3-compatible |
+| 2026-06-10 | (FetchContent) GLEW | nigels-com/glew glew-2.2.0 source release (SHA256 a9046a91…e0d4) | BSD-3-Clause / MIT (Modified BSD + Mesa3D + Khronos) | reference (built from source) | R2-2 Task 2 — OpenGL entry-point loader for renderer2 (GL 3.3 core). Fetched as the pre-amalgamated source release, built as static `etrm_glew` with GLEW_STATIC/GLEW_NO_GLU. BSD/MIT is GPLv3-compatible |
+| 2026-06-10 | (FetchContent) zlib | madler/zlib v1.3.1 | zlib | reference (built from source) | R2-2 Task 2 — inflate/crc + headers required because ET:Legacy's tr_public.h `#include <zlib.h>` unconditionally and the refimport carries zlib_compress/zlib_crc32. Built as `zlibstatic`; examples/tests disabled (ZLIB_BUILD_EXAMPLES OFF). zlib license is GPLv3-compatible |
 
 **SDL2** is now fetched via CMake `FetchContent` (pinned to release-2.30.9) as the
 platform layer for window/GL context/input — its **zlib** license is GPLv3-compatible.
+**GLEW** (glew-2.2.0) and **zlib** (v1.3.1) are likewise fetched via `FetchContent`
+(pinned) for the renderer2 DLL — see the port-log rows above.
 
 ## Bundled libraries (Phase 4 will modernize)
 
