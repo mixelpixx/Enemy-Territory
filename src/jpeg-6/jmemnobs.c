@@ -30,8 +30,8 @@
 #include <stdlib.h>
 
 /*
- * Memory allocation and ri.Freeing are controlled by the regular library
- * routines ri.Malloc() and ri.Free().
+ * Memory allocation and freeing are controlled by the C library
+ * routines malloc() and free().
  */
 
 GLOBAL void *
