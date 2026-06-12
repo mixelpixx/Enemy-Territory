@@ -650,8 +650,10 @@ static void imp_GLimp_SetGamma(unsigned char red[256], unsigned char green[256],
 	 * from r_gamma). The forward to our SDL hardware-ramp path is kept so a
 	 * future vendor update that re-enables it still works, and this one-shot
 	 * log makes any such call visible (it would mean double-gamma: hardware
-	 * ramp on top of shader gamma — revisit the no-op decision then). */
-	LogOnce(&g_loggedSetGamma, "renderer2 bridge: GLimp_SetGamma called -> forwarding to hardware ramp\n");
+	 * ramp on top of shader gamma — revisit the decision to keep forwarding,
+	 * and consider a documented no-op instead). */
+	LogOnce(&g_loggedSetGamma, "renderer2 bridge: GLimp_SetGamma called -> forwarding to hardware ramp "
+	        "(unexpected: gl2 gamma is shader-side; possible double-gamma — see tr2_bridge_theirs.c)\n");
 	BrdgOur_GLimp_SetGamma(red, green, blue);
 }
 
