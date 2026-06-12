@@ -2,7 +2,8 @@
 # GLSL / GL 3.3 core), built as a DLL loaded at runtime by the cl_renderer
 # dispatcher (exe-dir only).
 #
-# R2-2 / Task 3 (this file): the BRIDGE wires our engine (REF_API_VERSION 9) to
+# R2-2 / Task 3 (this file): the BRIDGE wires our engine (REF_API_VERSION 10
+# since R2-4) to
 # the vendored ET:Legacy renderer2 (their v10 interface). The DLL now exports the
 # bridge's GetRefAPI (no longer the R2-1 stub). Include isolation: the two header
 # worlds (ours / theirs) define identically-named types, so the bridge is split

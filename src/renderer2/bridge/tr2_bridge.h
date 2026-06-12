@@ -5,7 +5,7 @@ ET-RM renderer2 — BRIDGE neutral cross-TU contract (R2-2 / Task 3).
 THE INCLUDE-ISOLATION PROBLEM
 -----------------------------
 The bridge must speak BOTH header worlds:
-  * OURS   — src/renderer/tr_public.h (refimport_t/refexport_t v9, glimpParams_t),
+  * OURS   — src/renderer/tr_public.h (refimport_t/refexport_t v10, glimpParams_t),
              src/cgame/tr_types.h, src/game/q_shared.h.
   * THEIRS — src/renderer2/etlhdr/renderercommon/tr_public.h (v10) + their
              q_shared.h subset.
@@ -59,7 +59,7 @@ extern "C" {
  *  OURS-TU -> THEIRS-TU : initialization handshake.
  *
  *  tr2_bridge_ours.c calls Brdg_TheirsInit() from inside GetRefAPI, passing
- *  the apiVersion the engine requested (9). The theirs-TU builds their
+ *  the apiVersion the engine requested (10 since R2-4). The theirs-TU builds their
  *  refimport, calls ETL_GetRefAPI(THEIR_REF_API_VERSION, &theirRI), runs the
  *  layout check, and returns 1 on success (their refexport captured), 0 on
  *  failure (mismatched api / layout / null re) — in which case GetRefAPI
@@ -114,7 +114,7 @@ int   BrdgOur_CmdArgc(void);
 char *BrdgOur_CmdArgv(int i);
 void  BrdgOur_CmdExecuteText(int execWhen, const char *text);
 
-/* filesystem (our v9 refimport) */
+/* filesystem (our v10 refimport) */
 int   BrdgOur_FS_FileIsInPAK(const char *name, int *pChecksum);
 int   BrdgOur_FS_ReadFile(const char *name, void **buf);
 void  BrdgOur_FS_FreeFile(void *buf);
@@ -139,6 +139,13 @@ void  BrdgOur_GlconfigCopyBack(
 	int vidWidth, int vidHeight, float windowAspect, int displayFrequency,
 	int isFullscreen, void *ourGlconfig);
 
+/* collision model (RM R2-4, ri v10): real solid checks for renderer2's light
+ * grid (vec3_t/clipHandle_t differ per world -> primitives only here), and the
+ * debug-surface walker (the drawPoly callback signature is identical primitive
+ * types in both worlds, so the fn-ptr passes through verbatim). */
+int   BrdgOur_CmPointContents(const float *p, int model);
+void  BrdgOur_CmDrawDebugSurface(void (*drawPoly)(int color, int numPoints, float *points));
+
 /* GL window/context platform services (engine owns the SDL window) */
 void  BrdgOur_GLimp_Init(int major, int minor, int coreProfile, int debugContext);
 void  BrdgOur_GLimp_Shutdown(void);
@@ -155,7 +162,7 @@ void *BrdgOur_GL_GetProcAddress(const char *name);
  *  struct pointers are passed as void* (pass-through types) or already
  *  translated inside the wrapper (drifted types).
  *
- *  Naming mirrors OUR refexport_t member set (the v9 shape the engine expects).
+ *  Naming mirrors OUR refexport_t member set (the v10 shape the engine expects).
  *  Members our struct has but theirs lacks (SaveViewParms/RestoreViewParms) are
  *  filled by the ours-TU with logged-once no-ops and are NOT in this table.
  * ------------------------------------------------------------------------ */

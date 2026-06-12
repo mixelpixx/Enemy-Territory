@@ -68,7 +68,7 @@ static void mock_Error(int level, const char *fmt, ...)
 
 static int mock_Milliseconds(void) { return 0; }
 
-#define REF_API_VERSION_EXPECTED 9   /* our engine's version */
+#define REF_API_VERSION_EXPECTED 10  /* our engine's version (v10: + CM_PointContents) */
 
 int main(int argc, char **argv)
 {

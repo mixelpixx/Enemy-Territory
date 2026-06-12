@@ -17,8 +17,10 @@ q_shared.h subset, GLEW). Responsibilities:
                           trio over our FS_ReadFile; zlib_* -> linked zlib).
        (c) SAFE STUB    — service our engine doesn't expose / owns elsewhere
                           (IN_*, Sys_GLimp/SetEnv, CL_VideoRecording/WriteAVI,
-                          Cvar_CheckRange/SetDescription, CM_PointContents,
+                          Cvar_CheckRange/SetDescription,
                           GLimp_SplashImage) — logged-once.
+                          (CM_PointContents/CM_DrawDebugSurface became real
+                          passthroughs in R2-4 via the v10 refimport.)
 
   2. CVAR PROXY LAYER: a bridge-owned registry of THEIR-layout cvar_t proxies,
      synced from our cvars on Cvar_Get and once per frame (BeginFrame wrap).
@@ -317,27 +319,38 @@ static void imp_Cmd_ExecuteText(int exec_when, const char *text)
 }
 
 /* ======================================================================== *
- *  refimport: collision-debug  (SAFE STUB — menu has no collision model)
+ *  refimport: collision model  (PASSTHROUGH — RM R2-4, ri v10)
+ *
+ *  CM_PointContents was a logged-once 0 stub through R2-3 (our v9 refimport
+ *  had no CM_PointContents), which made tr_bsp.c's light-grid setup treat
+ *  every grid point as non-solid — subtly wrong ambient/directed light on
+ *  every map. The v10 refimport appends the real engine entry; forward it.
+ *  Their vec3_t is float[3] (decays to const float*) and clipHandle_t is int,
+ *  so the neutral primitive signature re-types without conversion.
+ *
+ *  NOTE: their tr_bsp.c callers compare the result with == CONTENTS_SOLID
+ *  (exact equality, not a & mask), so multi-content solid brushes read as
+ *  non-solid. That is upstream ET:Legacy behavior — kept for parity; keep it
+ *  in mind before blaming this passthrough for an A/B lighting discrepancy.
+ *
+ *  CM_DrawDebugSurface IS on our ri (it always was — the old no-op comment
+ *  claiming otherwise was wrong); the drawPoly callback signature is identical
+ *  primitive types in both worlds, so the fn-ptr forwards verbatim.
  * ======================================================================== */
 
-static int g_warnedPointContents;
 static int imp_CM_PointContents(const vec3_t p, clipHandle_t model)
 {
-	(void)p; (void)model;
-	LogOnce(&g_warnedPointContents,
-	        "renderer2 bridge: CM_PointContents stubbed to 0 (no clip model on the "
-	        "DLL side; only used for decal/mark culling — safe at menu)\n");
-	return 0;
+	return BrdgOur_CmPointContents(p, (int)model);
 }
 
 static void imp_CM_DrawDebugSurface(void (*drawPoly)(int color, int numPoints, float *points))
 {
-	(void)drawPoly;   /* engine's CM_DrawDebugSurface is not on our v9 ri; no-op */
+	BrdgOur_CmDrawDebugSurface(drawPoly);
 }
 
 /* ======================================================================== *
  *  refimport: filesystem
- *  PASSTHROUGH for the members our v9 ri has; the streaming trio
+ *  PASSTHROUGH for the members our ri has; the streaming trio
  *  (FS_FOpenFileRead/FS_Read) our ri LACKS -> REAL adapters over FS_ReadFile:
  *  open reads the whole file into a bridge handle slot; Read memcpys from the
  *  offset; close frees. Bounded (a small handle table) and correct for the
@@ -604,7 +617,7 @@ static void imp_GLimp_Init(glconfig_t *glConfig, const char *glConfigString)
 	/* 4. populate THEIR glConfig2 capability flags (textureNPOTAvailable,
 	 * float/depth/draw-buffer caps, etc.) by running the renderer's own
 	 * extension-detection. In stock ET:Legacy the engine calls
-	 * re.InitOpenGLSubSystem() before BeginRegistration; our v9 engine never
+	 * re.InitOpenGLSubSystem() before BeginRegistration; our engine never
 	 * does, so without this glConfig2 stays all-zero. The most visible fallout
 	 * was textureNPOTAvailable==qfalse, which makes R_CreateRenderImage round
 	 * the screen-capture images (e.g. _currentRender) up to the next power of
@@ -628,8 +641,19 @@ static void imp_GLimp_Init(glconfig_t *glConfig, const char *glConfigString)
 
 static void imp_GLimp_Shutdown(void)   { BrdgOur_GLimp_Shutdown(); }
 static void imp_GLimp_SwapFrame(void)  { BrdgOur_GLimp_EndFrame(); }
+static int g_loggedSetGamma;
 static void imp_GLimp_SetGamma(unsigned char red[256], unsigned char green[256], unsigned char blue[256])
 {
+	/* R2-4 T4 gamma audit: vendored renderer2 never calls this — its only
+	 * call site (R_SetColorMappings, tr_image.c) is commented out upstream,
+	 * so gl2 gamma is purely shader-side (RB_ColorCorrection, UNIFORM_GAMMA
+	 * from r_gamma). The forward to our SDL hardware-ramp path is kept so a
+	 * future vendor update that re-enables it still works, and this one-shot
+	 * log makes any such call visible (it would mean double-gamma: hardware
+	 * ramp on top of shader gamma — revisit the decision to keep forwarding,
+	 * and consider a documented no-op instead). */
+	LogOnce(&g_loggedSetGamma, "renderer2 bridge: GLimp_SetGamma called -> forwarding to hardware ramp "
+	        "(unexpected: gl2 gamma is shader-side; possible double-gamma — see tr2_bridge_theirs.c)\n");
 	BrdgOur_GLimp_SetGamma(red, green, blue);
 }
 
