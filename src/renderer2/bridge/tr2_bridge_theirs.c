@@ -641,8 +641,17 @@ static void imp_GLimp_Init(glconfig_t *glConfig, const char *glConfigString)
 
 static void imp_GLimp_Shutdown(void)   { BrdgOur_GLimp_Shutdown(); }
 static void imp_GLimp_SwapFrame(void)  { BrdgOur_GLimp_EndFrame(); }
+static int g_loggedSetGamma;
 static void imp_GLimp_SetGamma(unsigned char red[256], unsigned char green[256], unsigned char blue[256])
 {
+	/* R2-4 T4 gamma audit: vendored renderer2 never calls this — its only
+	 * call site (R_SetColorMappings, tr_image.c) is commented out upstream,
+	 * so gl2 gamma is purely shader-side (RB_ColorCorrection, UNIFORM_GAMMA
+	 * from r_gamma). The forward to our SDL hardware-ramp path is kept so a
+	 * future vendor update that re-enables it still works, and this one-shot
+	 * log makes any such call visible (it would mean double-gamma: hardware
+	 * ramp on top of shader gamma — revisit the no-op decision then). */
+	LogOnce(&g_loggedSetGamma, "renderer2 bridge: GLimp_SetGamma called -> forwarding to hardware ramp\n");
 	BrdgOur_GLimp_SetGamma(red, green, blue);
 }
 
