@@ -48,15 +48,18 @@ before merging; milestones are tagged.
   ones, and the default network rate matches what competitive ET servers have
   used for two decades.
 
-**An optional modern renderer** (`rm-r2-1` through `rm-r2-3`, in progress)
+**An optional modern renderer** (`rm-r2-1` through `rm-r2-4`)
 - ET:Legacy's GLSL renderer ("renderer2", GPL like this project) is integrated
-  as a separate DLL, selected with `cl_renderer gl2` and a `vid_restart`. The
-  stock maps load and play under it. The original renderer remains the default
-  and is untouched; if the modern renderer fails to load for any reason the
-  game falls back to the original. Work toward full feature parity and, later,
-  optional modern effects (per-pixel lighting, shadow mapping, HDR) continues.
+  as a separate DLL, selected with `cl_renderer gl2` and a `vid_restart`. A
+  full round is playable under it: player models and animations, decals,
+  dynamic lights, coronas, fog, foliage, rain and snow, and demo playback have
+  all been verified against the original renderer with side-by-side
+  screenshots. The original renderer remains the default and is untouched; if
+  the modern renderer fails to load for any reason the game falls back to the
+  original.
 
-Planned next, in order: renderer feature parity and modern effects, then
+Planned next, in order: optional modern rendering effects (per-pixel lighting,
+shadow mapping, HDR — each behind its own switch, all off by default), then
 network modernization (denial-of-service hardening, HTTPS downloads, a revived
 server browser). Linux and macOS support is deferred but kept in mind — new
 code prefers SDL and standard APIs. Details in `docs/MODERNIZATION.md`.
