@@ -617,7 +617,7 @@ static void imp_GLimp_Init(glconfig_t *glConfig, const char *glConfigString)
 	/* 4. populate THEIR glConfig2 capability flags (textureNPOTAvailable,
 	 * float/depth/draw-buffer caps, etc.) by running the renderer's own
 	 * extension-detection. In stock ET:Legacy the engine calls
-	 * re.InitOpenGLSubSystem() before BeginRegistration; our v9 engine never
+	 * re.InitOpenGLSubSystem() before BeginRegistration; our engine never
 	 * does, so without this glConfig2 stays all-zero. The most visible fallout
 	 * was textureNPOTAvailable==qfalse, which makes R_CreateRenderImage round
 	 * the screen-capture images (e.g. _currentRender) up to the next power of
