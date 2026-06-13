@@ -22,6 +22,15 @@ uniform float u_Time;
 uniform vec3  u_ViewOrigin;
 #if defined(USE_NORMAL_MAPPING)
 uniform mat4 u_NormalTextureMatrix;
+// RM (vendored mechanical, R2-5 Task 4): declare u_DepthScale, which the
+// USE_PARALLAX_MAPPING block below references (var_S = ... * u_DepthScale) but
+// upstream never declared in this shader — a latent bug that ERR_DROPs with
+// "'u_DepthScale' : undeclared identifier" when r_parallaxMapping is enabled on
+// lightmapped world surfaces. Copied verbatim from the sibling parallax-capable
+// vertex shaders (forwardLighting_vp/liquid_vp/vertexLighting_DBS_*_vp).
+#if defined(USE_PARALLAX_MAPPING)
+uniform float u_DepthScale;
+#endif // USE_PARALLAX_MAPPING
 #if defined(USE_REFLECTIONS) || defined(USE_SPECULAR)
 uniform mat4 u_SpecularTextureMatrix;
 #if defined(USE_REFLECTIONS)
