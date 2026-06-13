@@ -233,13 +233,6 @@ typedef struct {
 	int hashSize;                               // hash table size (power of 2)
 	fileInPack_t*   *hashTable;                 // hash table
 	fileInPack_t*   buildBuffer;                // buffer with the filenames etc.
-	qboolean fromBasepath;                      // RM/NET-1: qtrue iff this pak was loaded
-	                                            // from fs_basepath (the install location),
-	                                            // qfalse if loaded from fs_homepath/fs_cdpath.
-	                                            // Used to gate native cgame/ui module loading
-	                                            // so attacker-supplied (downloaded) paks can
-	                                            // never be the source of a loaded module DLL.
-	                                            // See FS_CL_ExtractFromPakFile threat model.
 } pack_t;
 
 typedef struct {
@@ -317,6 +310,29 @@ static char     *fs_serverReferencedPakNames[MAX_SEARCH_PATHS];     // pk3 names
 // last valid game folder used
 char lastValidBase[MAX_OSPATH];
 char lastValidGame[MAX_OSPATH];
+
+// =====================================================================
+// RM/NET-1 SECURITY: startup-trusted module-pak checksum set.
+//
+// The set of pak content-checksums (pack_t.checksum, the feed-independent
+// Com_BlockChecksum) for EVERY pak present after the FIRST FS_Startup, i.e.
+// the clean install state captured during FS_InitFilesystem BEFORE any client
+// connection / autodownload / connection-triggered FS_Restart has run.
+//
+// A native cgame/ui module DLL may be extracted+loaded ONLY from a pak whose
+// checksum is in this set (see FS_CL_ExtractFromPakFile). A pak that arrives
+// after startup (e.g. a downloaded pak, added by the post-connect FS_Restart)
+// is NOT in this set, so it can never source native code — even when the
+// download write area (fs_homepath) is the SAME directory as the install
+// (fs_basepath), which is the default on Windows. Trust is keyed on
+// presence-at-clean-startup, NOT on any directory/path string comparison.
+//
+// Captured exactly once and guarded against re-capture, so a later
+// connection-triggered FS_Restart (which re-adds the same shipped paks, same
+// checksums) cannot repopulate or extend it with downloaded paks.
+static int      fs_trustedModulePaks[MAX_SEARCH_PATHS];     // checksums present at clean startup
+static int      fs_numTrustedModulePaks;
+static qboolean fs_trustedModulePaksCaptured = qfalse;
 
 #ifdef FS_MISSING
 FILE*       missingFiles = NULL;
@@ -1401,6 +1417,33 @@ static pack_t *FS_FindSourcePak( const char *filename ) {
 
 /*
 ==================
+FS_IsTrustedModulePak
+
+RM/NET-1 (security): qtrue iff the given pak's content-checksum is in the
+startup-trusted set (present at clean process startup; captured once in
+FS_InitFilesystem). This is the SECURITY PREDICATE that gates native cgame/ui
+module loading. It cannot be defeated by the fs_homepath==fs_basepath collapse,
+because it tests membership in a set frozen before any download/restart, not
+which directory string a pak was added from. Fails safe (qfalse) on a NULL pak
+or if the set was never captured.
+==================
+*/
+static qboolean FS_IsTrustedModulePak( const pack_t *pak ) {
+	int i;
+
+	if ( !pak || !fs_trustedModulePaksCaptured ) {
+		return qfalse;  // fail safe: no pak, or set never captured
+	}
+	for ( i = 0 ; i < fs_numTrustedModulePaks ; i++ ) {
+		if ( fs_trustedModulePaks[i] == pak->checksum ) {
+			return qtrue;
+		}
+	}
+	return qfalse;
+}
+
+/*
+==================
 FS_CL_ExtractFromPakFile
 
 NERVE - SMF - Extracts the latest file from a pak file.
@@ -1433,7 +1476,7 @@ qboolean FS_CL_ExtractFromPakFile( const char *fullpath, const char *gamedir, co
 	needToCopy = qtrue;
 
 	// =====================================================================
-	// RM/NET-1 SECURITY GUARD — install-pak-only native module loading.
+	// RM/NET-1 SECURITY GUARD — startup-trusted-pak-only native module loading.
 	//
 	// THREAT MODEL: This function is the pure-server path that extracts a
 	// native cgame/ui DLL out of a pure-approved pak and writes it to
@@ -1441,42 +1484,54 @@ qboolean FS_CL_ExtractFromPakFile( const char *fullpath, const char *gamedir, co
 	// execution. The pure-approval list (fs_serverPaks, via FS_PakIsPure) is
 	// SERVER-SUPPLIED, and the checksum does not authenticate where the pak
 	// came from. If a malicious server advertised a trojan pak's checksum and
-	// the client obtained that pak over the network (downloads are stubbed
+	// the client obtained that pak over the network (autodownload is stubbed
 	// today, but must not be able to reopen this hole later), the extract path
-	// would happily load attacker-controlled native code = remote code exec.
+	// would otherwise happily load attacker-controlled native code = RCE.
 	//
-	// DEFENSE: require the pak that actually sources the module bytes to be one
-	// that was loaded from the local INSTALL location (fs_basepath), not from
-	// the homepath/download write area. We validate the PROVENANCE of the
-	// SOURCE pack inside fs_searchpaths (pack_t.fromBasepath), NOT the path of
-	// the extracted output file — the output always lands in fs_homepath, which
-	// on Windows usually EQUALS fs_basepath, so an output-path check would be a
-	// trivially-true no-op. FS_FindSourcePak selects the very pak the read path
-	// below would serve the bytes from, so we authenticate exactly that source.
+	// DEFENSE: a module DLL may load ONLY from a pak that was present at clean
+	// process startup — i.e. whose content-checksum is in the startup-trusted
+	// set captured once in FS_InitFilesystem, before any connection/download/
+	// connection-triggered FS_Restart. A downloaded pak is added only LATER (by
+	// the post-connect FS_Restart), so its checksum is not in the set and it is
+	// refused. We resolve the EXACT pak the read path below would serve the
+	// bytes from (FS_FindSourcePak, TOCTOU-free) and test ITS checksum against
+	// the startup set. This deliberately does NOT use any directory/path string:
+	// on the default Windows config fs_homepath == fs_basepath, so the old
+	// fromBasepath/basepath-provenance test collapsed (a just-downloaded pak in
+	// the shared dir got tagged "install-local" by the post-connect restart).
+	// Startup-presence cannot be forged by that collapse — the set is frozen
+	// before any pak can arrive over the network.
 	//
-	// FAIL SAFE: if the source pak cannot be confirmed install-local, REFUSE.
-	// Returning qfalse makes the caller (Sys_LoadDll) ERR_DROP before any
-	// LoadLibrary. NET-1 Task 4 will replace this Com_Printf with a friendly
-	// version-/integrity-mismatch message; the refusal itself must stay.
+	// The client's OWN shipped rm_bin.pk3 IS present at startup, so its checksum
+	// is in the set and it stays trusted across the connect FS_Restart (which
+	// re-adds the identical file with the identical content-checksum). A server
+	// whose module pak differs is a version mismatch (NET-1 Task 4), never a
+	// download-and-run.
+	//
+	// FAIL SAFE: if FS_FindSourcePak returns NULL for a module filename, REFUSE
+	// (no source pak => not trusted), rather than falling through — we must not
+	// rely on the loose-file extension whitelist staying exactly as-is. Likewise
+	// refuse if the source pak's checksum is not in the startup set. Returning
+	// qfalse makes the caller (Sys_LoadDll) ERR_DROP before any LoadLibrary.
+	// NET-1 Task 4 will replace the Com_Printf below with a friendly version-/
+	// integrity-mismatch message; the refusal itself must stay unchanged.
 	// =====================================================================
 	{
 		pack_t *srcPak = FS_FindSourcePak( filename );
 
-		if ( !srcPak ) {
-			// No pak would serve it (e.g. loose file, or not pure-approved).
-			// Nothing to extract here; let the normal load path proceed.
-			// (If it is genuinely missing, the FS_ReadFile below returns -1.)
-		} else if ( !srcPak->fromBasepath ) {
-			// The bytes would come from a pak outside the local install
-			// (homepath/download area). This is exactly the untrusted-origin
-			// case. Refuse rather than load attacker-controllable native code.
-			Com_Printf( S_COLOR_RED "SECURITY: refusing to load module '%s' from "
-				"non-install pak '%s' (origin: %s). Native modules must come from "
-				"the local install.\n", filename, srcPak->pakFilename,
-				srcPak->pakGamename );
+		if ( !FS_IsTrustedModulePak( srcPak ) ) {
+			// Either no pak would serve these module bytes (srcPak == NULL), or
+			// the source pak was not present at clean startup (e.g. a downloaded
+			// pak introduced by a post-connect FS_Restart, possibly living in the
+			// same directory as the install when fs_homepath == fs_basepath).
+			// Either way this is an untrusted origin for native code: REFUSE.
+			Com_Printf( S_COLOR_RED "SECURITY: refusing to load native module '%s'"
+				": source pak %s is not in the startup-trusted set. Native modules"
+				" must come from a pak present at install/startup.\n", filename,
+				srcPak ? srcPak->pakFilename : "(none)" );
 			return qfalse;      // FAIL SAFE -> caller ERR_DROPs
 		}
-		// else: srcPak->fromBasepath == qtrue -> trusted install-local source.
+		// else: srcPak is in the startup-trusted set -> safe to extract+load.
 	}
 
 	// read in compressed file
@@ -3036,17 +3091,11 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 		// store the game name for downloading
 		strcpy( pak->pakGamename, dir );
 
-		// RM/NET-1: record install provenance. A pak loaded from fs_basepath is
-		// part of the local install and is trusted to source native module DLLs
-		// (cgame/ui). A pak loaded from fs_homepath (the write/download area) or
-		// fs_cdpath is NOT trusted for module loading, even if it is pure-approved
-		// by the server. Note: on Windows fs_homepath usually EQUALS fs_basepath,
-		// in which case the homepath FS_AddGameDirectory pass is skipped entirely
-		// (see FS_Startup) so every pak is marked install-local here. Only when a
-		// distinct homepath exists (the case that download/restart introduces) can
-		// a pak end up fromBasepath==qfalse.
-		pak->fromBasepath = ( fs_basepath && fs_basepath->string[0] &&
-			!Q_stricmp( path, fs_basepath->string ) ) ? qtrue : qfalse;
+		// RM/NET-1: native cgame/ui module loading is NOT gated by which directory
+		// string a pak was added from (the old fromBasepath provenance check, which
+		// collapsed when fs_homepath == fs_basepath on the default Windows config).
+		// It is gated instead by the startup-trusted checksum set captured once in
+		// FS_InitFilesystem — see FS_CL_ExtractFromPakFile / FS_IsTrustedModulePak.
 
 		search = Z_Malloc( sizeof( searchpath_t ) );
 		search->pack = pak;
@@ -4187,6 +4236,44 @@ void FS_PureServerSetReferencedPaks( const char *pakSums, const char *pakNames )
 
 /*
 ================
+FS_CaptureTrustedModulePaks
+
+RM/NET-1 (security): snapshot the content-checksums of every pak currently in
+fs_searchpaths into the startup-trusted module-pak set. Called exactly once,
+from FS_InitFilesystem, on the clean install state (before any connection,
+autodownload, or connection-triggered FS_Restart). Guarded so a later
+FS_Restart cannot repopulate the set — i.e. a downloaded pak introduced by a
+post-connect restart will never be admitted as a trusted module source.
+================
+*/
+static void FS_CaptureTrustedModulePaks( void ) {
+	searchpath_t    *search;
+
+	if ( fs_trustedModulePaksCaptured ) {
+		// Already captured the clean-startup state; never extend it. A
+		// connection-triggered FS_Restart must NOT be able to add downloaded
+		// pak checksums to the trusted set.
+		return;
+	}
+
+	fs_numTrustedModulePaks = 0;
+	for ( search = fs_searchpaths ; search ; search = search->next ) {
+		if ( !search->pack ) {
+			continue;   // loose-file dir, not a pak
+		}
+		if ( fs_numTrustedModulePaks >= MAX_SEARCH_PATHS ) {
+			break;
+		}
+		fs_trustedModulePaks[ fs_numTrustedModulePaks++ ] = search->pack->checksum;
+	}
+
+	fs_trustedModulePaksCaptured = qtrue;
+	Com_DPrintf( "RM/NET-1: captured %d startup-trusted module pak(s)\n",
+		fs_numTrustedModulePaks );
+}
+
+/*
+================
 FS_InitFilesystem
 
 Called only at inital startup, not when the filesystem
@@ -4215,6 +4302,12 @@ void FS_InitFilesystem( void ) {
 	// see if we are going to allow add-ons
 	FS_SetRestrictions();
 	Com_RMTrace( "  FS_SetRestrictions done; reading default.cfg..." );
+
+	// RM/NET-1 (security): freeze the startup-trusted module-pak checksum set
+	// NOW, on the clean install state — before any server connection, download,
+	// or connection-triggered FS_Restart can introduce additional paks. This is
+	// the one and only capture point (the call is idempotent / re-capture-guarded).
+	FS_CaptureTrustedModulePaks();
 
 	// if we can't find default.cfg, assume that the paths are
 	// busted and error out now, rather than getting an unreadable
