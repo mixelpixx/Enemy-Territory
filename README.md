@@ -77,8 +77,15 @@ before merging; milestones are tagged.
   message and returns to the menu. This is not yet a public auto-download
   server. See `docs/HOSTING.md`.
 
-Planned next, in order: a revived server browser; later, denial-of-service
-hardening and modern (TLS) content downloads for custom-map distribution. Linux
+**Denial-of-service hardening** (`sv_protect`)
+- Server-side rate limiting on the connectionless `getstatus`/`getinfo`/
+  `getchallenge`/`rcon` handlers, plus optional DRDoS reflection protection,
+  gated behind the `sv_protect` cvar. The local client of a listen server is
+  always exempt, so normal play is unaffected. Public / internet-facing servers
+  should set `sv_protect 3`. See `docs/HOSTING.md`.
+
+Planned next, in order: a revived server browser; later, modern (TLS) content
+downloads for custom-map distribution. Linux
 and macOS support is deferred but kept in mind — new code prefers SDL and
 standard APIs. Details in `docs/MODERNIZATION.md`.
 

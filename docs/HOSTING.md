@@ -113,3 +113,8 @@ The local client of a listen server is always exempt: loopback traffic
 Game* and playing on the same machine is never throttled regardless of
 `sv_protect`. Dropped requests are noted only in developer output
 (`developer 1`); they are not fatal and require no operator action.
+
+There are no separate tuning cvars: the rate is governed by the built-in
+~10 requests/second-per-source limits, which are intentionally generous and
+suit normal hosting without adjustment. Operators choose behaviour by setting
+`sv_protect` (`0` off, `1` rate limiting, `3` rate limiting + DRDoS).

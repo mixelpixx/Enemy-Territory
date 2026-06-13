@@ -509,7 +509,12 @@ static leakyBucket_t *SVC_BucketForAddress( const netadr_t *address, int burst, 
 			Com_Memset( bucket, 0, sizeof( leakyBucket_t ) );
 		}
 
-		if ( bucket->type == NA_BAD ) {
+		// An unused/reclaimed bucket is zero-initialized. NOTE: this engine's
+		// netadrtype_t starts NA_BOT=0 (NA_BAD=1), unlike ioquake3/ET:Legacy
+		// where NA_BAD=0, so a zeroed bucket is NA_BOT here, not NA_BAD. Test
+		// for "not a live IPv4 bucket" instead (the limiter only ever stores
+		// NA_IP) so a fresh table actually allocates slots.
+		if ( bucket->type != NA_IP ) {
 			bucket->type = address->type;
 			switch ( address->type ) {
 			case NA_IP:
