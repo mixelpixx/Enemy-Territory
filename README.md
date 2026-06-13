@@ -67,11 +67,20 @@ before merging; milestones are tagged.
   authored map content to show. All switches, their costs, and limitations are
   documented in `docs/MODERN-EFFECTS.md`.
 
-Planned next, in order: network modernization — currently, hosting a server
-under the default "pure" mode and a revived server browser; later, denial-of-service
-hardening and modern (TLS) content downloads. Linux and macOS support is
-deferred but kept in mind — new code prefers SDL and standard APIs. Details in
-`docs/MODERNIZATION.md`.
+**Pure-server hosting** (`rm-pure-hosting`)
+- Because RM ships its client game logic (`cgame`/`ui`) as native DLLs, the
+  build packs them into `etmain/rm_bin.pk3` so servers running the default
+  "pure" mode start and accept matched clients. This covers *Host Game* listen
+  servers and dedicated servers for clients on the same build (LAN / same-build
+  groups). A client only ever loads modules from its own install, so a server
+  cannot push executable code; a build mismatch shows an "update your client"
+  message and returns to the menu. This is not yet a public auto-download
+  server. See `docs/HOSTING.md`.
+
+Planned next, in order: a revived server browser; later, denial-of-service
+hardening and modern (TLS) content downloads for custom-map distribution. Linux
+and macOS support is deferred but kept in mind — new code prefers SDL and
+standard APIs. Details in `docs/MODERNIZATION.md`.
 
 ## Game data is not included
 

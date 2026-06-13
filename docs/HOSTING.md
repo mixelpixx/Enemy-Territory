@@ -51,7 +51,28 @@ clients; `sv_pure 1` works.
 
 Clients must run the **same RM build** as the server. Pure validation compares
 the client's loaded paks against the server's, and `rm_bin.pk3` carries the
-client modules, so a client with a different `rm_bin.pk3` (a different RM build)
-will be rejected. The friendly version-mismatch message and explicit
-build-version enforcement are a later increment; today a mismatch surfaces as
-the stock pure-server rejection.
+client modules, so a client with a different (or missing) `rm_bin.pk3` — i.e. a
+different RM build — is rejected. The client sees a plain-language dialog ("This
+server is running a different ET-RM build. Update your client...") and returns
+cleanly to the menu; no mismatched code is ever loaded.
+
+## Security model
+
+A client only ever loads client game modules (`cgame`/`ui`) that are present in
+its **own install** at clean startup. The engine freezes the set of
+content-checksums of all paks loaded at startup (`FS_CaptureTrustedModulePaks`),
+and module bytes are only served from a pak in that frozen set
+(`FS_CL_ExtractFromPakFile`). A pak that appears later — for example one pulled
+in by a server-triggered download or `FS_Restart` after connecting — is refused
+as a module source, and the load fails closed. This means a server can never
+push executable client code; the worst a build mismatch can do is the
+"update your client" rejection above.
+
+Consequences and scope:
+
+- Pure servers are for **matched clients** (same build): LAN, same-build groups,
+  and dedicated servers whose operator ships the matching `rm_bin.pk3`.
+- This is **not** a public auto-download server. A client cannot fetch and run a
+  server's modules; it must already have the matching build installed.
+- Custom-map distribution over HTTP (downloading map *content*, not code) is a
+  separate future feature and is unrelated to this module-load guard.

@@ -4273,6 +4273,15 @@ static void FS_CaptureTrustedModulePaks( void ) {
 	fs_trustedModulePaksCaptured = qtrue;
 	Com_DPrintf( "RM/NET-1: captured %d startup-trusted module pak(s)\n",
 		fs_numTrustedModulePaks );
+
+	if ( fs_numTrustedModulePaks == 0 ) {
+		// Defense-in-depth diagnostic: with no trusted paks captured, pure-server
+		// module loading will fail closed (FS_CL_ExtractFromPakFile admits nothing).
+		// This usually means a packaging regression — rm_bin.pk3 didn't ship. Make
+		// the otherwise-confusing field failure obvious instead of silent.
+		Com_Printf( "WARNING: no trusted module paks at startup; "
+			"pure-server module loading will fail\n" );
+	}
 }
 
 /*
