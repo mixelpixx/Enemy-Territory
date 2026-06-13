@@ -783,6 +783,10 @@ void SV_Init( void ) {
 	sv_minPing = Cvar_Get( "sv_minPing", "0", CVAR_ARCHIVE | CVAR_SERVERINFO );
 	sv_maxPing = Cvar_Get( "sv_maxPing", "0", CVAR_ARCHIVE | CVAR_SERVERINFO );
 	sv_floodProtect = Cvar_Get( "sv_floodProtect", "1", CVAR_ARCHIVE | CVAR_SERVERINFO );
+	// DoS hardening bitflags: 1 = SVP_IOQ3 (leaky-bucket OOB rate limiting), 2 = SVP_OWOLF (DRDoS reflection protection).
+	// Default "1": rate limiter ON. Limits are generous (10 req/sec/IP) and loopback is exempt, so normal/LAN play is
+	// unaffected; the DRDoS bit is off by default. Set 3 on public servers.
+	sv_protect = Cvar_Get( "sv_protect", "1", CVAR_ARCHIVE );
 	sv_allowAnonymous = Cvar_Get( "sv_allowAnonymous", "0", CVAR_SERVERINFO );
 	sv_friendlyFire = Cvar_Get( "g_friendlyFire", "1", CVAR_SERVERINFO | CVAR_ARCHIVE );           // NERVE - SMF
 	sv_maxlives = Cvar_Get( "g_maxlives", "0", CVAR_ARCHIVE | CVAR_LATCH | CVAR_SERVERINFO );      // NERVE - SMF

@@ -246,6 +246,20 @@ typedef struct tempBan_s {
 	int endtime;
 } tempBan_t;
 
+// server attack protection (sv_protect bitflags)
+#define SVP_IOQ3        0x0001      // 1 - ioQuake3 way (leaky-bucket OOB rate limiting)
+#define SVP_OWOLF       0x0002      // 2 - OpenWolf way (DRDoS reflection protection)
+
+// DoS hardening: getstatus+getinfo reflection receipt tracking
+typedef struct {
+	netadr_t adr;
+	int time;
+} receipt_t;
+
+// the maximum number of getstatus+getinfo responses that we send in
+// a two second time period.
+#define MAX_INFO_RECEIPTS  48
+
 
 #define MAX_MASTERS                         8               // max recipients for heartbeat packets
 #define MAX_TEMPBAN_ADDRESSES               MAX_CLIENTS
@@ -267,6 +281,7 @@ typedef struct {
 	entityState_t   *snapshotEntities;      // [numSnapshotEntities]
 	int nextHeartbeatTime;
 	challenge_t challenges[MAX_CHALLENGES]; // to prevent invalid IPs from connecting
+	receipt_t infoReceipts[MAX_INFO_RECEIPTS]; // DoS: getstatus/getinfo reflection tracking
 	netadr_t redirectAddress;               // for rcon return messages
 	tempBan_t tempBanAddresses[MAX_TEMPBAN_ADDRESSES];
 
@@ -287,6 +302,32 @@ typedef struct {
 extern serverStatic_t svs;                  // persistant server info across maps
 extern server_t sv;                         // cleared each map
 extern vm_t            *gvm;                // game virtual machine
+
+// DoS hardening: leaky-bucket OOB rate limiter (IPv4-only)
+typedef struct leakyBucket_s leakyBucket_t;
+
+struct leakyBucket_s {
+	netadrtype_t type;
+
+	union {
+		byte _4[4];
+	} ipv;
+
+	int lastTime;
+	signed char burst;
+
+	long hash;
+
+	leakyBucket_t *prev, *next;
+};
+
+// This is deliberately quite large to make it more of an effort to DoS
+#define MAX_BUCKETS         16384
+#define MAX_HASHES          1024
+
+qboolean SVC_RateLimit( leakyBucket_t *bucket, int burst, int period );
+qboolean SVC_RateLimitAddress( const netadr_t *from, int burst, int period );
+extern leakyBucket_t outboundLeakyBucket;
 
 
 #define MAX_MASTER_SERVERS  5
@@ -351,6 +392,7 @@ extern cvar_t *sv_packetdelay;
 
 //fretn
 extern cvar_t *sv_fullmsg;
+extern cvar_t *sv_protect;
 
 //===========================================================
 

@@ -92,6 +92,8 @@ cvar_t  *sv_packetdelay;
 // fretn
 cvar_t  *sv_fullmsg;
 
+cvar_t  *sv_protect;        // DoS hardening: bitflags 1=leaky-bucket OOB rate limiting, 2=DRDoS reflection protection
+
 void SVC_GameCompleteStatus( netadr_t from );       // NERVE - SMF
 
 #define LL( x ) x = LittleLong( x )
@@ -410,6 +412,192 @@ qboolean SV_VerifyChallenge( char *challenge ) {
 		}
 	}
 	return qtrue;
+}
+
+// ============================================================================
+// DoS hardening: leaky-bucket OOB rate limiter (ported from ET:Legacy, IPv4-only)
+// ============================================================================
+
+static leakyBucket_t buckets[MAX_BUCKETS];
+static leakyBucket_t *bucketHashes[MAX_HASHES];
+leakyBucket_t        outboundLeakyBucket;
+
+/*
+================
+SVC_HashForAddress
+
+Compute a hash chain index for an address (IPv4-only).
+================
+*/
+static long SVC_HashForAddress( const netadr_t *address ) {
+	const byte   *ip  = NULL;
+	size_t       size = 0;
+	unsigned int i;
+	long         hash = 0;
+
+	switch ( address->type ) {
+	case NA_IP:
+		ip   = address->ip;
+		size = sizeof( address->ip );
+		break;
+	default:
+		break;
+	}
+
+	if ( !ip ) {
+		Com_Printf( "SVC_HashForAddress: Invalid IP - hash value is 0\n" );
+		return 0;
+	}
+
+	for ( i = 0; i < size; i++ ) {
+		hash += (long)( ( ip[i] ) * ( i + 119 ) );
+	}
+
+	hash  = ( hash ^ ( hash >> 10 ) ^ ( hash >> 20 ) );
+	hash &= ( MAX_HASHES - 1 );
+
+	return hash;
+}
+
+/*
+================
+SVC_BucketForAddress
+
+Find or allocate a bucket for an address (IPv4-only), reclaiming expired
+buckets via LRU when the table is full.
+================
+*/
+static leakyBucket_t *SVC_BucketForAddress( const netadr_t *address, int burst, int period ) {
+	leakyBucket_t *bucket = NULL;
+	int           i;
+	long          hash = SVC_HashForAddress( address );
+	int           now  = Sys_Milliseconds();
+
+	for ( bucket = bucketHashes[hash]; bucket; bucket = bucket->next ) {
+		switch ( bucket->type ) {
+		case NA_IP:
+			if ( memcmp( bucket->ipv._4, address->ip, sizeof( address->ip ) ) == 0 ) {
+				return bucket;
+			}
+			break;
+		default:
+			break;
+		}
+	}
+
+	// make sure we will never use time 0
+	now = now ? now : 1;
+
+	for ( i = 0; i < MAX_BUCKETS; i++ ) {
+		int interval;
+
+		bucket   = &buckets[i];
+		interval = now - bucket->lastTime;
+
+		// Reclaim expired buckets
+		if ( bucket->lastTime > 0 && (unsigned) interval > ( burst * period ) ) {
+			if ( bucket->prev != NULL ) {
+				bucket->prev->next = bucket->next;
+			} else {
+				bucketHashes[bucket->hash] = bucket->next;
+			}
+
+			if ( bucket->next != NULL ) {
+				bucket->next->prev = bucket->prev;
+			}
+
+			Com_Memset( bucket, 0, sizeof( leakyBucket_t ) );
+		}
+
+		if ( bucket->type == NA_BAD ) {
+			bucket->type = address->type;
+			switch ( address->type ) {
+			case NA_IP:
+				Com_Memcpy( bucket->ipv._4, address->ip, sizeof( address->ip ) );
+				break;
+			default:
+				break;
+			}
+
+			bucket->lastTime = now;
+			bucket->burst    = 0;
+			bucket->hash     = hash;
+
+			// Add to the head of the relevant hash chain
+			bucket->next = bucketHashes[hash];
+			if ( bucketHashes[hash] != NULL ) {
+				bucketHashes[hash]->prev = bucket;
+			}
+
+			bucket->prev       = NULL;
+			bucketHashes[hash] = bucket;
+
+			return bucket;
+		}
+	}
+
+	// Couldn't allocate a bucket for this address
+	Com_DPrintf( "SVC_BucketForAddress: Could not allocate a bucket for client from %s\n", NET_AdrToString( *address ) );
+
+	return NULL;
+}
+
+/*
+================
+SVC_RateLimit
+
+Returns qtrue if the bucket's burst limit has been exceeded (caller should
+drop the request), qfalse otherwise.
+
+Don't call if the sv_protect SVP_IOQ3 flag is not set!
+================
+*/
+qboolean SVC_RateLimit( leakyBucket_t *bucket, int burst, int period ) {
+	if ( bucket != NULL ) {
+		int now              = Sys_Milliseconds();
+		int interval         = now - bucket->lastTime;
+		int expired          = interval / period;
+		int expiredRemainder = interval % period;
+
+		if ( expired > bucket->burst || interval < 0 ) {
+			bucket->burst    = 0;
+			bucket->lastTime = now;
+		} else {
+			bucket->burst   -= expired;
+			bucket->lastTime = now - expiredRemainder;
+		}
+
+		if ( bucket->burst < burst ) {
+			bucket->burst++;
+			return qfalse;
+		} else {
+			Com_DPrintf( "SVC_RateLimit: burst limit exceeded for bucket: %i limit: %i\n", bucket->burst, burst );
+		}
+	}
+
+	return qtrue;
+}
+
+/*
+================
+SVC_RateLimitAddress
+
+Rate limit for a particular address. Loopback is never limited so the local
+client on a listen server is never throttled.
+
+Don't call if the sv_protect SVP_IOQ3 flag is not set!
+================
+*/
+qboolean SVC_RateLimitAddress( const netadr_t *from, int burst, int period ) {
+	leakyBucket_t *bucket;
+
+	if ( from->type == NA_LOOPBACK ) {
+		return qfalse;
+	}
+
+	bucket = SVC_BucketForAddress( from, burst, period );
+
+	return SVC_RateLimit( bucket, burst, period );
 }
 
 /*
