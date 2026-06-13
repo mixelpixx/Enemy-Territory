@@ -1513,8 +1513,11 @@ qboolean FS_CL_ExtractFromPakFile( const char *fullpath, const char *gamedir, co
 	// rely on the loose-file extension whitelist staying exactly as-is. Likewise
 	// refuse if the source pak's checksum is not in the startup set. Returning
 	// qfalse makes the caller (Sys_LoadDll) ERR_DROP before any LoadLibrary.
-	// NET-1 Task 4 will replace the Com_Printf below with a friendly version-/
-	// integrity-mismatch message; the refusal itself must stay unchanged.
+	// NET-1 Task 4: the SECURITY Com_Printf below stays as the developer-level
+	// technical log (which module, which source pak, why). The player-facing
+	// "different ET-RM build / update your client" message is emitted by the
+	// caller's ERR_DROP (win_main.c Sys_LoadDll), whose text feeds the
+	// connection-error dialog via com_errorMessage. The refusal is unchanged.
 	// =====================================================================
 	{
 		pack_t *srcPak = FS_FindSourcePak( filename );
