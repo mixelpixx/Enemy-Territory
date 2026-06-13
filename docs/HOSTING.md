@@ -93,6 +93,13 @@ ET:Legacy / ioquake3 mitigations and gates them behind the `sv_protect` cvar.
 | 1   | `SVP_IOQ3`  | Leaky-bucket rate limiting on the `getstatus`/`getinfo`/`getchallenge` out-of-band handlers. Each source address is limited to roughly 10 requests/second, and a single global cap limits the total rate at which the server emits `getstatus`/`getinfo` reflection replies. Over-limit requests are dropped silently. |
 | 2   | `SVP_OWOLF` | DRDoS reflection protection. The server keeps a short ring of recent reply receipts (time + source); if it has already sent 3 or more replies to the same source within a ~2-second window, or if the whole ring is saturated within that window, further `getstatus`/`getinfo`/`getchallenge` replies to that source are suppressed. |
 
+Under `SVP_IOQ3` the `rcon` handler is additionally hardened: incoming `rcon`
+requests are per-IP rate-limited (roughly 10/second per source, loopback exempt),
+and a separate bucket throttles attempts that supply a wrong or empty password —
+slowing brute-force / dictionary guessing without ever throttling legitimate rcon
+(a correct password is not charged against that bucket). This is in addition to
+the pre-existing global 500 ms throttle, which is retained.
+
 Recommended settings:
 
 - **Default (`1`)** is fine for LAN and private/same-build groups. The limits

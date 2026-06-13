@@ -983,7 +983,16 @@ void SVC_RemoteCommand( netadr_t from, msg_t *msg ) {
 	static unsigned int lasttime = 0;
 	char *cmd_aux;
 
+	// NET-2: prevent using rcon as an amplifier and make dictionary attacks
+	// impractical - per-IP rate limit (NA_LOOPBACK exempt). qtrue == exceeded -> drop.
+	if ( ( sv_protect->integer & SVP_IOQ3 ) && SVC_RateLimitAddress( &from, 10, 1000 ) ) {
+		Com_DPrintf( "SVC_RemoteCommand: rate limit from %s exceeded, dropping request\n", NET_AdrToString( from ) );
+		return;
+	}
+
 	// TTimo - show_bug.cgi?id=534
+	// NET-2: keep the pre-existing global 500ms throttle as belt-and-suspenders
+	// (harmless) behind the new per-IP and bad-password buckets below.
 	time = Com_Milliseconds();
 	if ( time < ( lasttime + 500 ) ) {
 		return;
@@ -992,6 +1001,16 @@ void SVC_RemoteCommand( netadr_t from, msg_t *msg ) {
 
 	if ( !strlen( sv_rconPassword->string ) ||
 		 strcmp( Cmd_Argv( 1 ), sv_rconPassword->string ) ) {
+		// NET-2: charge a bad-password bucket only on a wrong/empty password so
+		// legitimate rcon (correct password) is never throttled, but brute-force
+		// guessing is slowed. qtrue == exceeded -> drop.
+		static leakyBucket_t bucket;
+
+		if ( ( sv_protect->integer & SVP_IOQ3 ) && SVC_RateLimit( &bucket, 10, 1000 ) ) {
+			Com_DPrintf( "SVC_RemoteCommand: bad rcon password rate limit exceeded, dropping request\n" );
+			return;
+		}
+
 		valid = qfalse;
 		Com_Printf( "Bad rcon from %s:\n%s\n", NET_AdrToString( from ), Cmd_Argv( 2 ) );
 	} else {
@@ -1056,6 +1075,7 @@ void SV_ConnectionlessPacket( netadr_t from, msg_t *msg ) {
 	MSG_ReadLong( msg );        // skip the -1 marker
 
 	if ( !Q_strncmp( "connect", &msg->data[4], 7 ) ) {
+		// NET-2: reviewed - decompressed output is bounded by MAX_MSGLEN; Huff_Decompress clamps cch to mbuf->maxsize - offset and the receive buffer is MAX_MSGLEN (32768).
 		Huff_Decompress( msg, 12 );
 	}
 
