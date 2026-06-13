@@ -602,7 +602,26 @@ void * QDECL Sys_LoadDll( const char *name, char *fqpath, intptr_t( QDECL **entr
 	//   (compatibility with other OSes loading procedure)
 	if ( cl_connectedToPureServer && Q_strncmp( name, "qagame", 6 ) ) {
 		if ( !FS_CL_ExtractFromPakFile( fn, gamedir, filename, NULL ) ) {
-			Com_Error( ERR_DROP, "Game code(%s) failed Pure Server check", filename );
+			// RM/NET-1 Task 4: this is the path a build-mismatched (or missing
+			// rm_bin.pk3) client actually hits against a pure server. The client
+			// modules (cgame/ui) ship inside rm_bin.pk3; FS_CL_ExtractFromPakFile
+			// only serves them from a pak the server pure-approved AND that was
+			// present at clean startup (the Task 3 security guard). A client on a
+			// different ET-RM build has a different rm_bin.pk3 checksum, so the
+			// server never pure-approves it, the module bytes have no trusted
+			// source pak, and the guard refuses (returns qfalse) here -- BEFORE
+			// any LoadLibrary of unmatched code. Do NOT loosen the refusal; only
+			// the player-facing wording changes. The technical detail (which
+			// module, why) was already logged by the SECURITY Com_Printf inside
+			// FS_CL_ExtractFromPakFile for developers. com_errorMessage (set by
+			// Com_Error below) drives the connection-error dialog the player sees.
+			Com_Error( ERR_DROP,
+				"This server is running a different ET-RM build.\n"
+				"Update your client to the server's version to play here.\n"
+				"\n"
+				"(Your %s does not match the server's -- the client game "
+				"modules are shipped in rm_bin.pk3 and must match the server.)",
+				filename );
 		}
 	}
 #endif

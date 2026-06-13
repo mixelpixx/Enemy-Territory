@@ -1259,19 +1259,60 @@ void Com_GetHunkInfo( int* hunkused, int* hunkexpected );
 
 #if defined( _WIN32 )
 
-// qagame_mp_x86.dll
+// RM: these shifted strings are matched (as substrings) against the module
+// filename in FS_FOpenFileRead to set the cgame/ui/qagame pure-reference flags.
+// They MUST stay in sync with Sys_GetDLLName() (win_main.c), which is arch-split:
+// x86_64 -> "<name>_mp_x86_64.dll", arm64 -> "<name>_mp_arm64.dll". If a value
+// here doesn't match the filename Sys_GetDLLName actually produces, the cgame/ui
+// reference flags are silently dropped and sv_pure validation breaks
+// ("Unpure client detected. Invalid .PK3 files referenced!"). The block below
+// mirrors win_main.c's arch split; the legacy 32-bit Win32 (x86) name is no
+// longer encoded because RM does not target 32-bit Windows.
+
+#if defined( _M_ARM64 )
+
+// qagame_mp_arm64.dll
 #define SYS_DLLNAME_QAGAME_SHIFT 6
-#define SYS_DLLNAME_QAGAME "wgmgskesve~><4jrr"
+#define SYS_DLLNAME_QAGAME "wgmgskesvegxs<:4jrr"
 
-// cgame_mp_x86.dll
+// cgame_mp_arm64.dll
 #define SYS_DLLNAME_CGAME_SHIFT 2
-#define SYS_DLLNAME_CGAME "eicogaoraz:80fnn"
+#define SYS_DLLNAME_CGAME "eicogaoracto860fnn"
 
-// ui_mp_x86.dll
+// ui_mp_arm64.dll
 #define SYS_DLLNAME_UI_SHIFT 5
-#define SYS_DLLNAME_UI "zndrud}=;3iqq"
+#define SYS_DLLNAME_UI "zndrudfwr;93iqq"
+
+#else // x86_64 (the default RM Windows target)
+
+// qagame_mp_x86_64.dll
+#define SYS_DLLNAME_QAGAME_SHIFT 6
+#define SYS_DLLNAME_QAGAME "wgmgskesve~><e<:4jrr"
+
+// cgame_mp_x86_64.dll
+#define SYS_DLLNAME_CGAME_SHIFT 2
+#define SYS_DLLNAME_CGAME "eicogaoraz:8a860fnn"
+
+// ui_mp_x86_64.dll
+#define SYS_DLLNAME_UI_SHIFT 5
+#define SYS_DLLNAME_UI "zndrud}=;d;93iqq"
+
+#endif // _M_ARM64
 
 #elif defined( __linux__ )
+
+// WARNING (RM): these are the STOCK 2010 32-bit unix names and they match the
+// stock unix_main.c Sys_GetDLLName ("%s.mp.i386.so"), which RM has NOT ported to
+// 64-bit. They are mutually consistent today, so a 32-bit unix build would still
+// reference correctly -- but RM ships no Linux build. When the Linux port lands,
+// unix_main.c Sys_GetDLLName AND these constants MUST be updated TOGETHER to the
+// chosen 64-bit naming (note: the 64-bit Linux convention is undecided -- stock
+// unix uses dot separators ".mp.<arch>.so", the Win32 block above uses underscores;
+// pick one in the loader, then regenerate these shifted strings to match it, or a
+// pure Linux host will fail with "Unpure client detected"). Encoding a guessed
+// 64-bit name here now would only DESYNC from the still-32-bit loader. Do NOT
+// change these without changing unix_main.c in the same commit. See the _WIN32
+// block above for the pattern.
 
 // qagame.mp.i386.so
 #define SYS_DLLNAME_QAGAME_SHIFT 6
@@ -1286,6 +1327,12 @@ void Com_GetHunkInfo( int* hunkused, int* hunkexpected );
 #define SYS_DLLNAME_UI "zn3ru3n8=;3xt"
 
 #elif __MACOS__
+
+// WARNING (RM): stock 2010 mac names, consistent with the stock mac_main.cpp
+// Sys_GetDLLName ("%s_mac" / "%s_d_mac"). RM has NOT ported the macOS loader.
+// When it lands, update mac_main.cpp Sys_GetDLLName AND these constants TOGETHER
+// to the chosen 64-bit naming, then regenerate the shifted strings -- otherwise a
+// pure macOS host will fail with "Unpure client detected". See the _WIN32 block.
 
 #ifdef _DEBUG
 // qagame_d_mac
