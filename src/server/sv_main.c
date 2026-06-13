@@ -624,6 +624,20 @@ void SVC_Status( netadr_t from ) {
 		return;
 	}
 
+	// DoS hardening: rate-limit getstatus to prevent amplifier abuse
+	if ( sv_protect->integer & SVP_IOQ3 ) {
+		// per-source inbound rate limit (amplifier reflection/flood guard)
+		if ( SVC_RateLimitAddress( &from, 10, 1000 ) ) {
+			Com_DPrintf( "SVC_Status: rate limit from %s exceeded, dropping request\n", NET_AdrToString( from ) );
+			return;
+		}
+		// global outbound reflection bandwidth cap
+		if ( SVC_RateLimit( &outboundLeakyBucket, 10, 100 ) ) {
+			Com_DPrintf( "SVC_Status: outbound rate limit exceeded, dropping request\n" );
+			return;
+		}
+	}
+
 	//bani - bugtraq 12534
 	if ( !SV_VerifyChallenge( Cmd_Argv( 1 ) ) ) {
 		return;
@@ -750,6 +764,20 @@ void SVC_Info( netadr_t from ) {
 		return;
 	}
 
+	// DoS hardening: rate-limit getinfo to prevent amplifier abuse
+	if ( sv_protect->integer & SVP_IOQ3 ) {
+		// per-source inbound rate limit (amplifier reflection/flood guard)
+		if ( SVC_RateLimitAddress( &from, 10, 1000 ) ) {
+			Com_DPrintf( "SVC_Info: rate limit from %s exceeded, dropping request\n", NET_AdrToString( from ) );
+			return;
+		}
+		// global outbound reflection bandwidth cap
+		if ( SVC_RateLimit( &outboundLeakyBucket, 10, 100 ) ) {
+			Com_DPrintf( "SVC_Info: outbound rate limit exceeded, dropping request\n" );
+			return;
+		}
+	}
+
 	//bani - bugtraq 12534
 	if ( !SV_VerifyChallenge( Cmd_Argv( 1 ) ) ) {
 		return;
@@ -817,6 +845,109 @@ void SVC_Info( netadr_t from ) {
 	}
 
 	NET_OutOfBandPrint( NS_SERVER, from, "infoResponse\n%s", infostring );
+}
+
+/*
+==============
+SV_CheckDRDoS
+
+DRDoS stands for "Distributed Reflected Denial of Service".
+See here: http://www.lemuria.org/security/application-drdos.html
+
+If the address isn't NA_IP, it's automatically denied. (RM is IPv4-only.)
+
+Returns qfalse if we're good; qtrue means we need to block.
+
+Don't call this if the sv_protect SVP_OWOLF flag is not set!
+==============
+*/
+static qboolean SV_CheckDRDoS( netadr_t from ) {
+	int i;
+	int globalCount;
+	int specificCount;
+	int timeNow;
+	receipt_t *receipt;
+	netadr_t exactFrom;
+	int oldest;
+	int oldestTime;
+	static int lastGlobalLogTime = 0;
+	static int lastSpecificLogTime = 0;
+
+	// Usually the network is smart enough to not allow incoming UDP packets
+	// with a source address being a spoofed LAN address.  Even if that's not
+	// the case, sending packets to other hosts in the LAN is not a big deal.
+	// NA_LOOPBACK qualifies as a LAN address - never block the local client.
+	if ( from.type == NA_LOOPBACK ) {
+		return qfalse;
+	}
+
+	timeNow = svs.time;
+	exactFrom = from;
+
+	// Time has wrapped
+	if ( lastGlobalLogTime > timeNow || lastSpecificLogTime > timeNow ) {
+		lastGlobalLogTime = 0;
+		lastSpecificLogTime = 0;
+
+		// just setting time to 1 (cannot be 0 as then globalCount would not be counted)
+		for ( i = 0; i < MAX_INFO_RECEIPTS; i++ ) {
+			if ( svs.infoReceipts[i].time ) {
+				svs.infoReceipts[i].time = 1; // hack it so we count globalCount correctly
+			}
+		}
+	}
+
+	if ( from.type == NA_IP ) {
+		from.ip[3] = 0; // xx.xx.xx.0
+	}
+
+	// Count receipts in last 2 seconds.
+	globalCount = 0;
+	specificCount = 0;
+	receipt = &svs.infoReceipts[0];
+	oldest = 0;
+	oldestTime = 0x7fffffff;
+	for ( i = 0; i < MAX_INFO_RECEIPTS; i++, receipt++ ) {
+		if ( receipt->time + 2000 > timeNow ) {
+			if ( receipt->time ) {
+				// When the server starts, all receipt times are at zero.  Furthermore,
+				// svs.time is close to zero.  We check that the receipt time is already
+				// set so that during the first two seconds after server starts, queries
+				// from the master servers don't get ignored.  As a consequence a potentially
+				// unlimited number of getinfo+getstatus responses may be sent during the
+				// first frame of a server's life.
+				globalCount++;
+			}
+			if ( NET_CompareBaseAdr( from, receipt->adr ) ) {
+				specificCount++;
+			}
+		}
+		if ( receipt->time < oldestTime ) {
+			oldestTime = receipt->time;
+			oldest = i;
+		}
+	}
+
+	if ( globalCount == MAX_INFO_RECEIPTS ) { // All receipts happened in last 2 seconds.
+		if ( lastGlobalLogTime + 1000 <= timeNow ) { // Limit one log every second.
+			Com_DPrintf( "SV_CheckDRDoS: Detected flood of getinfo/getstatus connectionless packets\n" );
+			lastGlobalLogTime = timeNow;
+		}
+		return qtrue;
+	}
+	if ( specificCount >= 3 ) { // Already sent 3 to this IP in last 2 seconds.
+		if ( lastSpecificLogTime + 1000 <= timeNow ) { // Limit one log every second.
+			Com_DPrintf( "SV_CheckDRDoS: Possible DRDoS attack to address %s, ignoring getinfo/getstatus connectionless packet\n",
+						 NET_AdrToString( exactFrom ) );
+			lastSpecificLogTime = timeNow;
+		}
+		return qtrue;
+	}
+
+	receipt = &svs.infoReceipts[oldest];
+	receipt->adr = from;
+	receipt->time = timeNow;
+	return qfalse;
 }
 
 /*
@@ -936,10 +1067,19 @@ void SV_ConnectionlessPacket( netadr_t from, msg_t *msg ) {
 	Com_DPrintf( "SV packet %s : %s\n", NET_AdrToString( from ), c );
 
 	if ( !Q_stricmp( c,"getstatus" ) ) {
+		if ( ( sv_protect->integer & SVP_OWOLF ) && SV_CheckDRDoS( from ) ) {
+			return;
+		}
 		SVC_Status( from  );
 	} else if ( !Q_stricmp( c,"getinfo" ) ) {
+		if ( ( sv_protect->integer & SVP_OWOLF ) && SV_CheckDRDoS( from ) ) {
+			return;
+		}
 		SVC_Info( from );
 	} else if ( !Q_stricmp( c,"getchallenge" ) ) {
+		if ( ( sv_protect->integer & SVP_OWOLF ) && SV_CheckDRDoS( from ) ) {
+			return;
+		}
 		SV_GetChallenge( from );
 	} else if ( !Q_stricmp( c,"connect" ) ) {
 		SV_DirectConnect( from );

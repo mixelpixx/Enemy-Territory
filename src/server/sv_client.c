@@ -61,6 +61,12 @@ void SV_GetChallenge( netadr_t from ) {
 		return;
 	}
 
+	// DoS hardening: per-source rate limit (challenge response is tiny, no outbound bucket)
+	if ( ( sv_protect->integer & SVP_IOQ3 ) && SVC_RateLimitAddress( &from, 10, 1000 ) ) {
+		Com_DPrintf( "SV_GetChallenge: rate limit from %s exceeded\n", NET_AdrToString( from ) );
+		return;
+	}
+
 	if ( SV_TempBanIsBanned( from ) ) {
 		NET_OutOfBandPrint( NS_SERVER, from, "print\n%s\n", sv_tempbanmessage->string );
 		return;
