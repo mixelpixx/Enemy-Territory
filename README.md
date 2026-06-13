@@ -56,15 +56,22 @@ before merging; milestones are tagged.
   all been verified against the original renderer with side-by-side
   screenshots. The original renderer remains the default and is untouched; if
   the modern renderer fails to load for any reason the game falls back to the
-  original. The modern renderer's optional effects (HDR, bloom, shadow mapping,
-  per-pixel materials, SSAO, and more — all off by default) are documented in
-  `docs/MODERN-EFFECTS.md`.
+  original.
 
-Planned next, in order: optional modern rendering effects (per-pixel lighting,
-shadow mapping, HDR — each behind its own switch, all off by default), then
-network modernization (denial-of-service hardening, HTTPS downloads, a revived
-server browser). Linux and macOS support is deferred but kept in mind — new
-code prefers SDL and standard APIs. Details in `docs/MODERNIZATION.md`.
+**Optional modern effects** (`rm-r2-5`)
+- On the modern renderer, each effect is its own switch and all are off by
+  default — turning them all off reproduces the original look exactly. Working
+  on stock content: HDR with tone mapping, bloom, shadow mapping (with soft
+  shadows), screen-space ambient occlusion, depth of field, and film grain.
+  Per-pixel material lighting and world shadow casting are in place but need
+  authored map content to show. All switches, their costs, and limitations are
+  documented in `docs/MODERN-EFFECTS.md`.
+
+Planned next, in order: network modernization — currently, hosting a server
+under the default "pure" mode and a revived server browser; later, denial-of-service
+hardening and modern (TLS) content downloads. Linux and macOS support is
+deferred but kept in mind — new code prefers SDL and standard APIs. Details in
+`docs/MODERNIZATION.md`.
 
 ## Game data is not included
 
