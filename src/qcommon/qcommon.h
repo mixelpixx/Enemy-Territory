@@ -1259,17 +1259,25 @@ void Com_GetHunkInfo( int* hunkused, int* hunkexpected );
 
 #if defined( _WIN32 )
 
-// qagame_mp_x86.dll
+// RM: 64-bit module names. These shifted strings are matched (as substrings)
+// against the module filename in FS_FOpenFileRead to set the cgame/ui/qagame
+// pure-reference flags. They MUST stay in sync with Sys_GetDLLName(), which on
+// Windows x86_64 produces "<name>_mp_x86_64.dll". The retail 32-bit constants
+// ("..._mp_x86.dll") are not substrings of the 64-bit names, so a stale value
+// here silently drops the cgame/ui reference flags and breaks sv_pure
+// validation ("Unpure client detected"). See SYS_GetDLLName in win_main.c.
+
+// qagame_mp_x86_64.dll
 #define SYS_DLLNAME_QAGAME_SHIFT 6
-#define SYS_DLLNAME_QAGAME "wgmgskesve~><4jrr"
+#define SYS_DLLNAME_QAGAME "wgmgskesve~><e<:4jrr"
 
-// cgame_mp_x86.dll
+// cgame_mp_x86_64.dll
 #define SYS_DLLNAME_CGAME_SHIFT 2
-#define SYS_DLLNAME_CGAME "eicogaoraz:80fnn"
+#define SYS_DLLNAME_CGAME "eicogaoraz:8a860fnn"
 
-// ui_mp_x86.dll
+// ui_mp_x86_64.dll
 #define SYS_DLLNAME_UI_SHIFT 5
-#define SYS_DLLNAME_UI "zndrud}=;3iqq"
+#define SYS_DLLNAME_UI "zndrud}=;d;93iqq"
 
 #elif defined( __linux__ )
 
