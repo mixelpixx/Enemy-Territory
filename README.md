@@ -56,7 +56,9 @@ before merging; milestones are tagged.
   all been verified against the original renderer with side-by-side
   screenshots. The original renderer remains the default and is untouched; if
   the modern renderer fails to load for any reason the game falls back to the
-  original.
+  original. The modern renderer's optional effects (HDR, bloom, shadow mapping,
+  per-pixel materials, SSAO, and more — all off by default) are documented in
+  `docs/MODERN-EFFECTS.md`.
 
 Planned next, in order: optional modern rendering effects (per-pixel lighting,
 shadow mapping, HDR — each behind its own switch, all off by default), then
