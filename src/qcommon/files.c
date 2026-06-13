@@ -233,6 +233,13 @@ typedef struct {
 	int hashSize;                               // hash table size (power of 2)
 	fileInPack_t*   *hashTable;                 // hash table
 	fileInPack_t*   buildBuffer;                // buffer with the filenames etc.
+	qboolean fromBasepath;                      // RM/NET-1: qtrue iff this pak was loaded
+	                                            // from fs_basepath (the install location),
+	                                            // qfalse if loaded from fs_homepath/fs_cdpath.
+	                                            // Used to gate native cgame/ui module loading
+	                                            // so attacker-supplied (downloaded) paks can
+	                                            // never be the source of a loaded module DLL.
+	                                            // See FS_CL_ExtractFromPakFile threat model.
 } pack_t;
 
 typedef struct {
@@ -1348,6 +1355,52 @@ int FS_FOpenFileRead_Filtered( const char *qpath, fileHandle_t *file, qboolean u
 #if !defined( DEDICATED )
 /*
 ==================
+FS_FindSourcePak
+
+RM/NET-1 (security): returns the pack_t that FS_FOpenFileRead would actually
+serve `filename` from, walking fs_searchpaths in the exact same order and with
+the same pure-approval filter (FS_PakIsPure) that the real read path uses. We
+must select the SAME pak the engine would read the bytes from, otherwise the
+provenance check below would validate a different pak than the one whose bytes
+get loaded (a TOCTOU-style mismatch). Loose-file (directory) searchpaths are
+ignored here on purpose: a native module that resolves to a loose file did not
+come from a pak and is out of scope for the pure-server extract path.
+
+Returns NULL if no pak would serve the file.
+==================
+*/
+static pack_t *FS_FindSourcePak( const char *filename ) {
+	searchpath_t    *search;
+	pack_t          *pak;
+	fileInPack_t    *pakFile;
+	long hash = 0;
+
+	for ( search = fs_searchpaths ; search ; search = search->next ) {
+		if ( !search->pack ) {
+			continue;       // loose-file dir: not a pak source
+		}
+		hash = FS_HashFileName( filename, search->pack->hashSize );
+		if ( !search->pack->hashTable[hash] ) {
+			continue;
+		}
+		// same pure filter the real read path applies
+		if ( !FS_PakIsPure( search->pack ) ) {
+			continue;
+		}
+		pak = search->pack;
+		pakFile = pak->hashTable[hash];
+		do {
+			if ( !FS_FilenameCompare( pakFile->name, filename ) ) {
+				return pak;     // this is the pak FS_FOpenFileRead would read from
+			}
+			pakFile = pakFile->next;
+		} while ( pakFile != NULL );
+	}
+	return NULL;
+}
+
+/*
+==================
 FS_CL_ExtractFromPakFile
 
 NERVE - SMF - Extracts the latest file from a pak file.
@@ -1378,6 +1431,53 @@ qboolean FS_CL_ExtractFromPakFile( const char *fullpath, const char *gamedir, co
 	FILE            *destHandle;
 
 	needToCopy = qtrue;
+
+	// =====================================================================
+	// RM/NET-1 SECURITY GUARD — install-pak-only native module loading.
+	//
+	// THREAT MODEL: This function is the pure-server path that extracts a
+	// native cgame/ui DLL out of a pure-approved pak and writes it to
+	// fs_homepath, after which win_main.c LoadLibrary()s it = native code
+	// execution. The pure-approval list (fs_serverPaks, via FS_PakIsPure) is
+	// SERVER-SUPPLIED, and the checksum does not authenticate where the pak
+	// came from. If a malicious server advertised a trojan pak's checksum and
+	// the client obtained that pak over the network (downloads are stubbed
+	// today, but must not be able to reopen this hole later), the extract path
+	// would happily load attacker-controlled native code = remote code exec.
+	//
+	// DEFENSE: require the pak that actually sources the module bytes to be one
+	// that was loaded from the local INSTALL location (fs_basepath), not from
+	// the homepath/download write area. We validate the PROVENANCE of the
+	// SOURCE pack inside fs_searchpaths (pack_t.fromBasepath), NOT the path of
+	// the extracted output file — the output always lands in fs_homepath, which
+	// on Windows usually EQUALS fs_basepath, so an output-path check would be a
+	// trivially-true no-op. FS_FindSourcePak selects the very pak the read path
+	// below would serve the bytes from, so we authenticate exactly that source.
+	//
+	// FAIL SAFE: if the source pak cannot be confirmed install-local, REFUSE.
+	// Returning qfalse makes the caller (Sys_LoadDll) ERR_DROP before any
+	// LoadLibrary. NET-1 Task 4 will replace this Com_Printf with a friendly
+	// version-/integrity-mismatch message; the refusal itself must stay.
+	// =====================================================================
+	{
+		pack_t *srcPak = FS_FindSourcePak( filename );
+
+		if ( !srcPak ) {
+			// No pak would serve it (e.g. loose file, or not pure-approved).
+			// Nothing to extract here; let the normal load path proceed.
+			// (If it is genuinely missing, the FS_ReadFile below returns -1.)
+		} else if ( !srcPak->fromBasepath ) {
+			// The bytes would come from a pak outside the local install
+			// (homepath/download area). This is exactly the untrusted-origin
+			// case. Refuse rather than load attacker-controllable native code.
+			Com_Printf( S_COLOR_RED "SECURITY: refusing to load module '%s' from "
+				"non-install pak '%s' (origin: %s). Native modules must come from "
+				"the local install.\n", filename, srcPak->pakFilename,
+				srcPak->pakGamename );
+			return qfalse;      // FAIL SAFE -> caller ERR_DROPs
+		}
+		// else: srcPak->fromBasepath == qtrue -> trusted install-local source.
+	}
 
 	// read in compressed file
 	srcLength = FS_ReadFile( filename, (void **)&srcData );
@@ -2935,6 +3035,18 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 		Com_RMTrace( "      loaded %s (%i files)", sorted[i], pak->numfiles );
 		// store the game name for downloading
 		strcpy( pak->pakGamename, dir );
+
+		// RM/NET-1: record install provenance. A pak loaded from fs_basepath is
+		// part of the local install and is trusted to source native module DLLs
+		// (cgame/ui). A pak loaded from fs_homepath (the write/download area) or
+		// fs_cdpath is NOT trusted for module loading, even if it is pure-approved
+		// by the server. Note: on Windows fs_homepath usually EQUALS fs_basepath,
+		// in which case the homepath FS_AddGameDirectory pass is skipped entirely
+		// (see FS_Startup) so every pak is marked install-local here. Only when a
+		// distinct homepath exists (the case that download/restart introduces) can
+		// a pak end up fromBasepath==qfalse.
+		pak->fromBasepath = ( fs_basepath && fs_basepath->string[0] &&
+			!Q_stricmp( path, fs_basepath->string ) ) ? qtrue : qfalse;
 
 		search = Z_Malloc( sizeof( searchpath_t ) );
 		search->pack = pak;
