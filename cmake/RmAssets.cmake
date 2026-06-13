@@ -1,7 +1,10 @@
 # RmAssets.cmake — package the RM UI override assets into zz_rm_ui.pk3 on build.
 #
-# The rm/ tree holds our override resources (currently a single FOV-slider menu
-# at rm/ui/options_customise_game.menu). ET loads etmain/*.pk3 with precedence to
+# The rm/ tree holds our override resources: UI override menus plus the neutral
+# camera post-FX textures (rm/gfx/2d/camera/{grain,vignette}.png) that retail ET
+# never shipped — supplying them lets the gl2 r_cameraPostFX vignette/film-grain
+# shader sample real data instead of NULL (which crushed the frame to black).
+# ET loads etmain/*.pk3 with precedence to
 # alphabetically-later names, so a pak named "zz_rm_ui.pk3" wins over the retail
 # pak0.pk3 without touching the user's retail data. scripts/play.bat points
 # fs_homepath at build/bin, so we drop the pak in build/bin/etmain.
@@ -27,7 +30,9 @@ set(RM_PAK_ENTRIES
     ui/options_customise_game.menu
     ui/options_system.menu
     ui/profile_create.menu
-    ui/profile_create_initial.menu)
+    ui/profile_create_initial.menu
+    gfx/2d/camera/grain.png
+    gfx/2d/camera/vignette.png)
 
 # DEPENDS list: glob the rm/ source so adding menu files later just works.
 file(GLOB_RECURSE RM_ASSET_SOURCES CONFIGURE_DEPENDS "${RM_ASSET_SRC_DIR}/*")
