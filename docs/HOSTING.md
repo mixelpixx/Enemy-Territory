@@ -190,11 +190,12 @@ with:
 cmake -S . -B build -DRM_MASTER_HOST=master.example.com
 ```
 
-When set, both `MASTER_SERVER_NAME` and `MOTD_SERVER_NAME` (and therefore the
-`sv_master1` / `cl_master` defaults) resolve to that host. When **not** set
-(the default), they are the empty string and the engine relies entirely on the
-`sv_master2` community fallback and/or runtime cvars — local and dev builds
-ship with no baked-in master on purpose.
+`RM_MASTER_HOST` **defaults to `31.97.133.47`** (the project VPS master below), so
+a plain `cmake` build auto-points `sv_master1` / `cl_master` (via
+`MASTER_SERVER_NAME` / `MOTD_SERVER_NAME`) at it — the browser works out of the
+box. Override with `-DRM_MASTER_HOST=<host>` (e.g. a DNS name), or
+`-DRM_MASTER_HOST=""` for a master-less build configured purely at runtime. The
+`sv_master2` community fallback (`master.etlegacy.com`) applies regardless.
 
 **Summary:** an empty/unreachable master is always harmless — it is skipped on
 the server and yields an empty Internet list on the client; nothing hangs.
