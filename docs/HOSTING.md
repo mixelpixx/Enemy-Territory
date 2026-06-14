@@ -198,3 +198,57 @@ ship with no baked-in master on purpose.
 
 **Summary:** an empty/unreachable master is always harmless — it is skipped on
 the server and yields an empty Internet list on the client; nothing hangs.
+
+### Testing the Internet-browse flow against a local master
+
+You can prove the whole heartbeat → getservers → ping → connect path on one
+machine, with no VPS and no third-party software, using the test harness
+`docs/superpowers/evidence-scripts/mock_master.py`. It is a ~150-line Python
+stand-in for a q3/ET master: it binds UDP `27950`, records a server's IP:port
+when it receives a `heartbeat`, and answers `getservers <proto>` with a
+`getserversResponse` framed exactly as the client parser
+(`CL_ServersResponsePacket`, `src/client/cl_main.c`) expects. It logs every
+packet, so the log is the evidence the flow worked.
+
+1. **Mock master** (background):
+
+   ```
+   python docs/superpowers/evidence-scripts/mock_master.py --bind 127.0.0.1 --port 27950
+   ```
+
+2. **Dedicated server** — `dedicated 2` (public) so it heartbeats; point its
+   one master slot at the mock and clear the community fallback. Use a separate
+   `fs_homepath` holding the loose `qagame_mp_x86_64.dll` + `rm_bin.pk3`, with
+   `fs_basepath` pointing at the install that has the retail paks:
+
+   ```
+   etrmded.exe +set dedicated 2 +set sv_master1 127.0.0.1 +set sv_master2 "" \
+       +set net_port 27960 +set sv_hostname "RM-MASTER-TEST" \
+       +set fs_basepath <install> +set fs_homepath <ded-home> +map oasis
+   ```
+
+   The mock log shows `heartbeat EnemyTerritory-1` arriving from
+   `127.0.0.1:27960`.
+
+3. **Client** — point `cl_master` at the mock and drive the query headlessly.
+   `+set logfile 2` writes `etmain/etconsole.log` under `fs_homepath`:
+
+   ```
+   etrm.exe +set cl_master 127.0.0.1 +set developer 1 +set logfile 2 \
+       +set fs_basepath <install> +set fs_homepath <cl-home> \
+       +globalservers 0 84 +wait 100 +serverstatus 127.0.0.1:27960 \
+       +wait 50 +ping 127.0.0.1:27960 +wait 100 +quit
+   ```
+
+   The client log shows `Requesting servers from master 127.0.0.1...`, then
+   `CL_ServersResponsePacket` / `1 servers parsed`, then the `getinfo` ping and
+   `infoResponse` filling `sv_hostname RM-MASTER-TEST` / `mapname oasis`. A
+   plain `+connect 127.0.0.1:27960` then completes the
+   `challengeResponse`/`connectResponse` handshake (`Connected to a pure
+   server.`) and loads the map.
+
+   > Note: the parser's developer-only line `server: 0 ip: 127.0.0.1:14445`
+   > prints the port byte-swapped (`14445` = `0x386D`, the network-order form of
+   > `27960` = `0x6D38`). This is a cosmetic quirk of the stock `Com_DPrintf`
+   > after `BigShort`; the *stored* address is correct, as the successful ping
+   > and connect to `:27960` confirm.
