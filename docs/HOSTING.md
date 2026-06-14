@@ -76,3 +76,45 @@ Consequences and scope:
   server's modules; it must already have the matching build installed.
 - Custom-map distribution over HTTP (downloading map *content*, not code) is a
   separate future feature and is unrelated to this module-load guard.
+
+## DoS protection (`sv_protect`)
+
+The original engine answers a small set of *connectionless* (out-of-band) UDP
+queries — `getstatus`, `getinfo`, `getchallenge` — without any handshake. Each
+elicits a reply that is larger than the request, which lets an attacker spoof a
+victim's source address and use the server as a traffic amplifier (a reflected /
+distributed-reflected denial-of-service, "DRDoS"). RM ports the established
+ET:Legacy / ioquake3 mitigations and gates them behind the `sv_protect` cvar.
+
+`sv_protect` is a bitflag cvar (archived); default `1`:
+
+| Bit | Name        | Effect |
+|-----|-------------|--------|
+| 1   | `SVP_IOQ3`  | Leaky-bucket rate limiting on the `getstatus`/`getinfo`/`getchallenge` out-of-band handlers. Each source address is limited to roughly 10 requests/second, and a single global cap limits the total rate at which the server emits `getstatus`/`getinfo` reflection replies. Over-limit requests are dropped silently. |
+| 2   | `SVP_OWOLF` | DRDoS reflection protection. The server keeps a short ring of recent reply receipts (time + source); if it has already sent 3 or more replies to the same source within a ~2-second window, or if the whole ring is saturated within that window, further `getstatus`/`getinfo`/`getchallenge` replies to that source are suppressed. |
+
+Under `SVP_IOQ3` the `rcon` handler is additionally hardened: incoming `rcon`
+requests are per-IP rate-limited (roughly 10/second per source, loopback exempt),
+and a separate bucket throttles attempts that supply a wrong or empty password —
+slowing brute-force / dictionary guessing without ever throttling legitimate rcon
+(a correct password is not charged against that bucket). This is in addition to
+the pre-existing global 500 ms throttle, which is retained.
+
+Recommended settings:
+
+- **Default (`1`)** is fine for LAN and private/same-build groups. The limits
+  are deliberately generous, so normal browser refreshes and LAN play are never
+  affected.
+- **Public / internet-facing servers:** set `sv_protect 3` to enable both the
+  leaky-bucket limiter and DRDoS reflection protection.
+
+The local client of a listen server is always exempt: loopback traffic
+(`NA_LOOPBACK`) bypasses every limiter and the DRDoS check, so hosting *Host
+Game* and playing on the same machine is never throttled regardless of
+`sv_protect`. Dropped requests are noted only in developer output
+(`developer 1`); they are not fatal and require no operator action.
+
+There are no separate tuning cvars: the rate is governed by the built-in
+~10 requests/second-per-source limits, which are intentionally generous and
+suit normal hosting without adjustment. Operators choose behaviour by setting
+`sv_protect` (`0` off, `1` rate limiting, `3` rate limiting + DRDoS).

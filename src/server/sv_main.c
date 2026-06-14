@@ -92,6 +92,8 @@ cvar_t  *sv_packetdelay;
 // fretn
 cvar_t  *sv_fullmsg;
 
+cvar_t  *sv_protect;        // DoS hardening: bitflags 1=leaky-bucket OOB rate limiting, 2=DRDoS reflection protection
+
 void SVC_GameCompleteStatus( netadr_t from );       // NERVE - SMF
 
 #define LL( x ) x = LittleLong( x )
@@ -412,6 +414,197 @@ qboolean SV_VerifyChallenge( char *challenge ) {
 	return qtrue;
 }
 
+// ============================================================================
+// DoS hardening: leaky-bucket OOB rate limiter (ported from ET:Legacy, IPv4-only)
+// ============================================================================
+
+static leakyBucket_t buckets[MAX_BUCKETS];
+static leakyBucket_t *bucketHashes[MAX_HASHES];
+leakyBucket_t        outboundLeakyBucket;
+
+/*
+================
+SVC_HashForAddress
+
+Compute a hash chain index for an address (IPv4-only).
+================
+*/
+static long SVC_HashForAddress( const netadr_t *address ) {
+	const byte   *ip  = NULL;
+	size_t       size = 0;
+	unsigned int i;
+	long         hash = 0;
+
+	switch ( address->type ) {
+	case NA_IP:
+		ip   = address->ip;
+		size = sizeof( address->ip );
+		break;
+	default:
+		break;
+	}
+
+	if ( !ip ) {
+		Com_Printf( "SVC_HashForAddress: Invalid IP - hash value is 0\n" );
+		return 0;
+	}
+
+	for ( i = 0; i < size; i++ ) {
+		hash += (long)( ( ip[i] ) * ( i + 119 ) );
+	}
+
+	hash  = ( hash ^ ( hash >> 10 ) ^ ( hash >> 20 ) );
+	hash &= ( MAX_HASHES - 1 );
+
+	return hash;
+}
+
+/*
+================
+SVC_BucketForAddress
+
+Find or allocate a bucket for an address (IPv4-only), reclaiming expired
+buckets via LRU when the table is full.
+================
+*/
+static leakyBucket_t *SVC_BucketForAddress( const netadr_t *address, int burst, int period ) {
+	leakyBucket_t *bucket = NULL;
+	int           i;
+	long          hash = SVC_HashForAddress( address );
+	int           now  = Sys_Milliseconds();
+
+	for ( bucket = bucketHashes[hash]; bucket; bucket = bucket->next ) {
+		switch ( bucket->type ) {
+		case NA_IP:
+			if ( memcmp( bucket->ipv._4, address->ip, sizeof( address->ip ) ) == 0 ) {
+				return bucket;
+			}
+			break;
+		default:
+			break;
+		}
+	}
+
+	// make sure we will never use time 0
+	now = now ? now : 1;
+
+	for ( i = 0; i < MAX_BUCKETS; i++ ) {
+		int interval;
+
+		bucket   = &buckets[i];
+		interval = now - bucket->lastTime;
+
+		// Reclaim expired buckets
+		if ( bucket->lastTime > 0 && (unsigned) interval > ( burst * period ) ) {
+			if ( bucket->prev != NULL ) {
+				bucket->prev->next = bucket->next;
+			} else {
+				bucketHashes[bucket->hash] = bucket->next;
+			}
+
+			if ( bucket->next != NULL ) {
+				bucket->next->prev = bucket->prev;
+			}
+
+			Com_Memset( bucket, 0, sizeof( leakyBucket_t ) );
+		}
+
+		// An unused/reclaimed bucket is zero-initialized. NOTE: this engine's
+		// netadrtype_t starts NA_BOT=0 (NA_BAD=1), unlike ioquake3/ET:Legacy
+		// where NA_BAD=0, so a zeroed bucket is NA_BOT here, not NA_BAD. Test
+		// for "not a live IPv4 bucket" instead (the limiter only ever stores
+		// NA_IP) so a fresh table actually allocates slots.
+		if ( bucket->type != NA_IP ) {
+			bucket->type = address->type;
+			switch ( address->type ) {
+			case NA_IP:
+				Com_Memcpy( bucket->ipv._4, address->ip, sizeof( address->ip ) );
+				break;
+			default:
+				break;
+			}
+
+			bucket->lastTime = now;
+			bucket->burst    = 0;
+			bucket->hash     = hash;
+
+			// Add to the head of the relevant hash chain
+			bucket->next = bucketHashes[hash];
+			if ( bucketHashes[hash] != NULL ) {
+				bucketHashes[hash]->prev = bucket;
+			}
+
+			bucket->prev       = NULL;
+			bucketHashes[hash] = bucket;
+
+			return bucket;
+		}
+	}
+
+	// Couldn't allocate a bucket for this address
+	Com_DPrintf( "SVC_BucketForAddress: Could not allocate a bucket for client from %s\n", NET_AdrToString( *address ) );
+
+	return NULL;
+}
+
+/*
+================
+SVC_RateLimit
+
+Returns qtrue if the bucket's burst limit has been exceeded (caller should
+drop the request), qfalse otherwise.
+
+Don't call if the sv_protect SVP_IOQ3 flag is not set!
+================
+*/
+qboolean SVC_RateLimit( leakyBucket_t *bucket, int burst, int period ) {
+	if ( bucket != NULL ) {
+		int now              = Sys_Milliseconds();
+		int interval         = now - bucket->lastTime;
+		int expired          = interval / period;
+		int expiredRemainder = interval % period;
+
+		if ( expired > bucket->burst || interval < 0 ) {
+			bucket->burst    = 0;
+			bucket->lastTime = now;
+		} else {
+			bucket->burst   -= expired;
+			bucket->lastTime = now - expiredRemainder;
+		}
+
+		if ( bucket->burst < burst ) {
+			bucket->burst++;
+			return qfalse;
+		} else {
+			Com_DPrintf( "SVC_RateLimit: burst limit exceeded for bucket: %i limit: %i\n", bucket->burst, burst );
+		}
+	}
+
+	return qtrue;
+}
+
+/*
+================
+SVC_RateLimitAddress
+
+Rate limit for a particular address. Loopback is never limited so the local
+client on a listen server is never throttled.
+
+Don't call if the sv_protect SVP_IOQ3 flag is not set!
+================
+*/
+qboolean SVC_RateLimitAddress( const netadr_t *from, int burst, int period ) {
+	leakyBucket_t *bucket;
+
+	if ( from->type == NA_LOOPBACK ) {
+		return qfalse;
+	}
+
+	bucket = SVC_BucketForAddress( from, burst, period );
+
+	return SVC_RateLimit( bucket, burst, period );
+}
+
 /*
 ================
 SVC_Status
@@ -434,6 +627,20 @@ void SVC_Status( netadr_t from ) {
 	// ignore if we are in single player
 	if ( SV_GameIsSinglePlayer() ) {
 		return;
+	}
+
+	// DoS hardening: rate-limit getstatus to prevent amplifier abuse
+	if ( sv_protect->integer & SVP_IOQ3 ) {
+		// per-source inbound rate limit (amplifier reflection/flood guard)
+		if ( SVC_RateLimitAddress( &from, 10, 1000 ) ) {
+			Com_DPrintf( "SVC_Status: rate limit from %s exceeded, dropping request\n", NET_AdrToString( from ) );
+			return;
+		}
+		// global outbound reflection bandwidth cap
+		if ( SVC_RateLimit( &outboundLeakyBucket, 10, 100 ) ) {
+			Com_DPrintf( "SVC_Status: outbound rate limit exceeded, dropping request\n" );
+			return;
+		}
 	}
 
 	//bani - bugtraq 12534
@@ -562,6 +769,20 @@ void SVC_Info( netadr_t from ) {
 		return;
 	}
 
+	// DoS hardening: rate-limit getinfo to prevent amplifier abuse
+	if ( sv_protect->integer & SVP_IOQ3 ) {
+		// per-source inbound rate limit (amplifier reflection/flood guard)
+		if ( SVC_RateLimitAddress( &from, 10, 1000 ) ) {
+			Com_DPrintf( "SVC_Info: rate limit from %s exceeded, dropping request\n", NET_AdrToString( from ) );
+			return;
+		}
+		// global outbound reflection bandwidth cap
+		if ( SVC_RateLimit( &outboundLeakyBucket, 10, 100 ) ) {
+			Com_DPrintf( "SVC_Info: outbound rate limit exceeded, dropping request\n" );
+			return;
+		}
+	}
+
 	//bani - bugtraq 12534
 	if ( !SV_VerifyChallenge( Cmd_Argv( 1 ) ) ) {
 		return;
@@ -633,6 +854,109 @@ void SVC_Info( netadr_t from ) {
 
 /*
 ==============
+SV_CheckDRDoS
+
+DRDoS stands for "Distributed Reflected Denial of Service".
+See here: http://www.lemuria.org/security/application-drdos.html
+
+If the address isn't NA_IP, it's automatically denied. (RM is IPv4-only.)
+
+Returns qfalse if we're good; qtrue means we need to block.
+
+Don't call this if the sv_protect SVP_OWOLF flag is not set!
+==============
+*/
+static qboolean SV_CheckDRDoS( netadr_t from ) {
+	int i;
+	int globalCount;
+	int specificCount;
+	int timeNow;
+	receipt_t *receipt;
+	netadr_t exactFrom;
+	int oldest;
+	int oldestTime;
+	static int lastGlobalLogTime = 0;
+	static int lastSpecificLogTime = 0;
+
+	// Usually the network is smart enough to not allow incoming UDP packets
+	// with a source address being a spoofed LAN address.  Even if that's not
+	// the case, sending packets to other hosts in the LAN is not a big deal.
+	// NA_LOOPBACK qualifies as a LAN address - never block the local client.
+	if ( from.type == NA_LOOPBACK ) {
+		return qfalse;
+	}
+
+	timeNow = svs.time;
+	exactFrom = from;
+
+	// Time has wrapped
+	if ( lastGlobalLogTime > timeNow || lastSpecificLogTime > timeNow ) {
+		lastGlobalLogTime = 0;
+		lastSpecificLogTime = 0;
+
+		// just setting time to 1 (cannot be 0 as then globalCount would not be counted)
+		for ( i = 0; i < MAX_INFO_RECEIPTS; i++ ) {
+			if ( svs.infoReceipts[i].time ) {
+				svs.infoReceipts[i].time = 1; // hack it so we count globalCount correctly
+			}
+		}
+	}
+
+	if ( from.type == NA_IP ) {
+		from.ip[3] = 0; // xx.xx.xx.0
+	}
+
+	// Count receipts in last 2 seconds.
+	globalCount = 0;
+	specificCount = 0;
+	receipt = &svs.infoReceipts[0];
+	oldest = 0;
+	oldestTime = 0x7fffffff;
+	for ( i = 0; i < MAX_INFO_RECEIPTS; i++, receipt++ ) {
+		if ( receipt->time + 2000 > timeNow ) {
+			if ( receipt->time ) {
+				// When the server starts, all receipt times are at zero.  Furthermore,
+				// svs.time is close to zero.  We check that the receipt time is already
+				// set so that during the first two seconds after server starts, queries
+				// from the master servers don't get ignored.  As a consequence a potentially
+				// unlimited number of getinfo+getstatus responses may be sent during the
+				// first frame of a server's life.
+				globalCount++;
+			}
+			if ( NET_CompareBaseAdr( from, receipt->adr ) ) {
+				specificCount++;
+			}
+		}
+		if ( receipt->time < oldestTime ) {
+			oldestTime = receipt->time;
+			oldest = i;
+		}
+	}
+
+	if ( globalCount == MAX_INFO_RECEIPTS ) { // All receipts happened in last 2 seconds.
+		if ( lastGlobalLogTime + 1000 <= timeNow ) { // Limit one log every second.
+			Com_DPrintf( "SV_CheckDRDoS: Detected flood of getinfo/getstatus connectionless packets\n" );
+			lastGlobalLogTime = timeNow;
+		}
+		return qtrue;
+	}
+	if ( specificCount >= 3 ) { // Already sent 3 to this IP in last 2 seconds.
+		if ( lastSpecificLogTime + 1000 <= timeNow ) { // Limit one log every second.
+			Com_DPrintf( "SV_CheckDRDoS: Possible DRDoS attack to address %s, ignoring getinfo/getstatus connectionless packet\n",
+						 NET_AdrToString( exactFrom ) );
+			lastSpecificLogTime = timeNow;
+		}
+		return qtrue;
+	}
+
+	receipt = &svs.infoReceipts[oldest];
+	receipt->adr = from;
+	receipt->time = timeNow;
+	return qfalse;
+}
+
+/*
+==============
 SV_FlushRedirect
 
 ==============
@@ -664,7 +988,16 @@ void SVC_RemoteCommand( netadr_t from, msg_t *msg ) {
 	static unsigned int lasttime = 0;
 	char *cmd_aux;
 
+	// NET-2: prevent using rcon as an amplifier and make dictionary attacks
+	// impractical - per-IP rate limit (NA_LOOPBACK exempt). qtrue == exceeded -> drop.
+	if ( ( sv_protect->integer & SVP_IOQ3 ) && SVC_RateLimitAddress( &from, 10, 1000 ) ) {
+		Com_DPrintf( "SVC_RemoteCommand: rate limit from %s exceeded, dropping request\n", NET_AdrToString( from ) );
+		return;
+	}
+
 	// TTimo - show_bug.cgi?id=534
+	// NET-2: keep the pre-existing global 500ms throttle as belt-and-suspenders
+	// (harmless) behind the new per-IP and bad-password buckets below.
 	time = Com_Milliseconds();
 	if ( time < ( lasttime + 500 ) ) {
 		return;
@@ -673,6 +1006,16 @@ void SVC_RemoteCommand( netadr_t from, msg_t *msg ) {
 
 	if ( !strlen( sv_rconPassword->string ) ||
 		 strcmp( Cmd_Argv( 1 ), sv_rconPassword->string ) ) {
+		// NET-2: charge a bad-password bucket only on a wrong/empty password so
+		// legitimate rcon (correct password) is never throttled, but brute-force
+		// guessing is slowed. qtrue == exceeded -> drop.
+		static leakyBucket_t bucket;
+
+		if ( ( sv_protect->integer & SVP_IOQ3 ) && SVC_RateLimit( &bucket, 10, 1000 ) ) {
+			Com_DPrintf( "SVC_RemoteCommand: bad rcon password rate limit exceeded, dropping request\n" );
+			return;
+		}
+
 		valid = qfalse;
 		Com_Printf( "Bad rcon from %s:\n%s\n", NET_AdrToString( from ), Cmd_Argv( 2 ) );
 	} else {
@@ -737,6 +1080,7 @@ void SV_ConnectionlessPacket( netadr_t from, msg_t *msg ) {
 	MSG_ReadLong( msg );        // skip the -1 marker
 
 	if ( !Q_strncmp( "connect", &msg->data[4], 7 ) ) {
+		// NET-2: reviewed - decompressed output is bounded by MAX_MSGLEN; Huff_Decompress clamps cch to mbuf->maxsize - offset and the receive buffer is MAX_MSGLEN (32768).
 		Huff_Decompress( msg, 12 );
 	}
 
@@ -748,10 +1092,19 @@ void SV_ConnectionlessPacket( netadr_t from, msg_t *msg ) {
 	Com_DPrintf( "SV packet %s : %s\n", NET_AdrToString( from ), c );
 
 	if ( !Q_stricmp( c,"getstatus" ) ) {
+		if ( ( sv_protect->integer & SVP_OWOLF ) && SV_CheckDRDoS( from ) ) {
+			return;
+		}
 		SVC_Status( from  );
 	} else if ( !Q_stricmp( c,"getinfo" ) ) {
+		if ( ( sv_protect->integer & SVP_OWOLF ) && SV_CheckDRDoS( from ) ) {
+			return;
+		}
 		SVC_Info( from );
 	} else if ( !Q_stricmp( c,"getchallenge" ) ) {
+		if ( ( sv_protect->integer & SVP_OWOLF ) && SV_CheckDRDoS( from ) ) {
+			return;
+		}
 		SV_GetChallenge( from );
 	} else if ( !Q_stricmp( c,"connect" ) ) {
 		SV_DirectConnect( from );
