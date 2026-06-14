@@ -4141,8 +4141,8 @@ void CL_LocalServers_f( void ) {
 			to.type = NA_BROADCAST;
 			NET_SendPacket( NS_CLIENT, strlen( message ), message, to );
 
-			to.type = NA_BROADCAST_IPX;
-			NET_SendPacket( NS_CLIENT, strlen( message ), message, to );
+			// RM/NET-3: IPX broadcast removed — dead on modern platforms.
+			// LAN discovery is IPv4 NA_BROADCAST only.
 		}
 	}
 }

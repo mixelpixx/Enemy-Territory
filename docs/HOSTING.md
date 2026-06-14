@@ -160,6 +160,27 @@ or a community master to populate the Internet tab, e.g.
 simply returns no servers instead of hanging the UI; the LAN tab and direct
 `connect <ip>` are unaffected.
 
+### LAN discovery — the Local tab / `localservers`
+
+The **Local** tab of the in-game browser (or the `localservers` console command)
+finds servers on the local network *without* any master server. The client sends
+a connectionless `getinfo` query as an **IPv4 broadcast** (`255.255.255.255`) to
+each server port in the `PORT_SERVER` range, and any reachable RM/ET server
+replies with an `infoResponse` (hostname, map, player count, gametype, ping) that
+populates the list. This is the same reply path a direct ping to a known LAN IP
+exercises, so a server can also be found by `connect <lan-ip>` even if broadcast
+is filtered.
+
+A `dedicated 1` (LAN-only) server never contacts a master and relies entirely on
+this broadcast discovery. `dedicated 2` additionally heartbeats the configured
+masters for the Internet tab.
+
+> **RM/NET-3:** LAN discovery now emits **IPv4 broadcasts only**. The legacy IPX
+> broadcast (`NA_BROADCAST_IPX`) has been removed from the client browse path —
+> IPX is dead on modern platforms and only added a wasted send per port. The
+> port range and the `getinfo` payload are unchanged, so discovery of existing
+> ET servers is unaffected.
+
 ### Build-time default — `RM_MASTER_HOST`
 
 To bake a default master host into the binaries (used at go-live), configure
