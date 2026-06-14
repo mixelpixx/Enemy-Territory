@@ -199,6 +199,30 @@ ship with no baked-in master on purpose.
 **Summary:** an empty/unreachable master is always harmless — it is skipped on
 the server and yields an empty Internet list on the client; nothing hangs.
 
+### Live RM master server
+
+A master is deployed and running on the project VPS:
+
+```
+31.97.133.47:27950   (UDP)
+```
+
+It runs **dpmaster** (the standard Quake3/ET master daemon, which has built-in
+Wolfenstein: ET support — gamename `et`, protocol 84) as a hardened, unprivileged
+`systemd` service (`dpmaster.service`, enabled at boot). It validates each server
+with a `getinfo` round-trip before listing it, so it can't be used to list
+arbitrary spoofed addresses. UDP 27950 is open at both the OS firewall (`ufw`) and
+the Hostinger cloud firewall.
+
+To use it without rebuilding:
+- Server: `set sv_master1 31.97.133.47` (with `dedicated 2` so it heartbeats).
+- Client: `set cl_master 31.97.133.47`, then open the Internet tab.
+
+To bake it in as the default for a release build: `-DRM_MASTER_HOST=31.97.133.47`
+(or point a DNS name at the VPS and use that). Verified live end-to-end: a server
+heartbeats in, dpmaster validates it, and a client `getservers 84` query returns
+it — over the public internet.
+
 ### Testing the Internet-browse flow against a local master
 
 You can prove the whole heartbeat → getservers → ping → connect path on one
