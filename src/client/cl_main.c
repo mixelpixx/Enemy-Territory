@@ -55,6 +55,7 @@ cvar_t  *cl_debugMove;
 
 cvar_t  *cl_noprint;
 cvar_t  *cl_motd;
+cvar_t  *cl_master;             // ET-RM (NET-3): client Internet-browser master host
 cvar_t  *cl_autoupdate;         // DHM - Nerve
 
 cvar_t  *rcon_client_password;
@@ -1151,6 +1152,10 @@ void CL_RequestMotd( void ) {
 	char info[MAX_INFO_STRING];
 
 	if ( !cl_motd->integer ) {
+		return;
+	}
+	// ET-RM (NET-3): no MOTD host configured (empty default) -> nothing to resolve.
+	if ( !MOTD_SERVER_NAME[0] ) {
 		return;
 	}
 	Com_Printf( "Resolving %s\n", MOTD_SERVER_NAME );
@@ -3379,6 +3384,10 @@ void CL_Init( void ) {
 	//
 	cl_noprint = Cvar_Get( "cl_noprint", "0", 0 );
 	cl_motd = Cvar_Get( "cl_motd", "1", 0 );
+	// ET-RM (NET-3): the Internet-tab master host. Defaults to MASTER_SERVER_NAME
+	// (empty unless built with -DRM_MASTER_HOST); set at runtime to point the
+	// browser at an RM or community master. Archived so it persists.
+	cl_master = Cvar_Get( "cl_master", MASTER_SERVER_NAME, CVAR_ARCHIVE );
 	cl_autoupdate = Cvar_Get( "cl_autoupdate", "1", CVAR_ARCHIVE );
 
 	cl_timeout = Cvar_Get( "cl_timeout", "200", 0 );
@@ -4157,15 +4166,36 @@ void CL_GlobalServers_f( void ) {
 
 	cls.masterNum = atoi( Cmd_Argv( 1 ) );
 
-	Com_Printf( "Requesting servers from the master...\n" );
-
 	// reset the list, waiting for response
 	// -1 is used to distinguish a "no response"
 
 	if ( cls.masterNum == 0 ) {
-		NET_StringToAdr( MASTER_SERVER_NAME, &to );
+		// ET-RM (NET-3): the original dead etmaster.idsoftware.com default is gone.
+		// Use the runtime-settable cl_master cvar (defaults to MASTER_SERVER_NAME,
+		// which is empty unless built with -DRM_MASTER_HOST). Bail gracefully on an
+		// empty or unresolvable master so the browser never hangs the UI.
+		const char *master = cl_master->string;
+
+		if ( !master[0] ) {
+			Com_Printf( "No master server configured (set \"cl_master\" to an RM or community master host).\n" );
+			cls.numglobalservers = 0;
+			cls.pingUpdateSource = AS_GLOBAL;
+			return;
+		}
+
+		Com_Printf( "Requesting servers from master %s...\n", master );
+
+		if ( !NET_StringToAdr( master, &to ) ) {
+			Com_Printf( "Couldn't resolve master address: %s\n", master );
+			cls.numglobalservers = 0;
+			cls.pingUpdateSource = AS_GLOBAL;
+			return;
+		}
+
 		cls.numglobalservers = -1;
 		cls.pingUpdateSource = AS_GLOBAL;
+	} else {
+		Com_Printf( "Requesting servers from the master...\n" );
 	}
 	to.type = NA_IP;
 	to.port = BigShort( PORT_MASTER );

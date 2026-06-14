@@ -280,10 +280,29 @@ You or the server may be running older versions of the game. Press the auto-upda
 #endif
 
 // NERVE - SMF - wolf multiplayer master servers
+//
+// ET-RM (NET-3): the original master/motd host "etmaster.idsoftware.com" is DEAD
+// and has been removed as a baked-in default. The real RM master is supplied
+// either at build time via -DRM_MASTER_HOST=<host> (Task 4 go-live) or at
+// runtime via the sv_master1 / cl_master cvars. When neither is set the default
+// is the EMPTY string, which is harmless: empty master slots are skipped on the
+// server heartbeat loop and the client browser, so a missing master never hangs
+// startup or freezes the UI. A live community master (ET:Legacy) is wired as a
+// fallback via the sv_master2 default in sv_init.c.
 #ifndef MASTER_SERVER_NAME
-	#define MASTER_SERVER_NAME      "etmaster.idsoftware.com"
+	#ifdef RM_MASTER_HOST
+		#define MASTER_SERVER_NAME  RM_MASTER_HOST
+	#else
+		#define MASTER_SERVER_NAME  ""
+	#endif
 #endif
-#define MOTD_SERVER_NAME        "etmaster.idsoftware.com"    //"etmotd.idsoftware.com"			// ?.?.?.?
+#ifndef MOTD_SERVER_NAME
+	#ifdef RM_MASTER_HOST
+		#define MOTD_SERVER_NAME    RM_MASTER_HOST
+	#else
+		#define MOTD_SERVER_NAME    ""
+	#endif
+#endif
 
 #ifdef AUTHORIZE_SUPPORT
 	#define AUTHORIZE_SERVER_NAME   "wolfauthorize.idsoftware.com"

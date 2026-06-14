@@ -118,3 +118,62 @@ There are no separate tuning cvars: the rate is governed by the built-in
 ~10 requests/second-per-source limits, which are intentionally generous and
 suit normal hosting without adjustment. Operators choose behaviour by setting
 `sv_protect` (`0` off, `1` rate limiting, `3` rate limiting + DRDoS).
+
+## Server browser / master server
+
+ET advertises dedicated servers to players through *master servers*: a server
+sends periodic **heartbeats** to each configured master, and clients query a
+master for the server list shown on the Internet tab of the in-game browser.
+
+The original id master `etmaster.idsoftware.com` is **dead** and has been
+removed as a baked-in default — pointing at it was the bug NET-3 fixes. There
+is no hardcoded master in a stock build; you configure one of three ways.
+
+### Server side — `sv_master1` .. `sv_master5`
+
+A dedicated server (`dedicated 2`, i.e. public internet) heartbeats up to five
+master slots:
+
+- **`sv_master1`** — defaults to the build-time master (see `RM_MASTER_HOST`
+  below). In a normal build with no baked-in host this is **empty**, which is
+  harmless: empty slots are skipped, so the server starts cleanly with no DNS
+  hit and no "couldn't resolve" hang. Set it at runtime to your RM master, e.g.
+  `set sv_master1 master.example.com` in your `server.cfg`.
+- **`sv_master2`** — defaults to **`master.etlegacy.com`**, a live community
+  master (ET:Legacy). This keeps RM dedicated servers visible to the existing ET
+  scene out of the box. It is archived, so to opt out just set it empty:
+  `set sv_master2 ""`.
+- **`sv_master3` .. `sv_master5`** — empty by default; archived. Add extra
+  masters here if you want.
+
+Heartbeats are only sent when `dedicated` is `2`. A `LAN`-only server
+(`dedicated 1`) never contacts a master and is found via LAN discovery instead.
+If a master fails to resolve, that slot is cleared automatically so the server
+does not take repeated DNS hits — it never blocks startup or gameplay.
+
+### Client side — `cl_master`
+
+The Internet tab of the browser queries the host in **`cl_master`** (archived;
+defaults to the build-time master, empty in a stock build). Point it at your RM
+or a community master to populate the Internet tab, e.g.
+`set cl_master master.example.com`. With an empty `cl_master` the Internet tab
+simply returns no servers instead of hanging the UI; the LAN tab and direct
+`connect <ip>` are unaffected.
+
+### Build-time default — `RM_MASTER_HOST`
+
+To bake a default master host into the binaries (used at go-live), configure
+with:
+
+```
+cmake -S . -B build -DRM_MASTER_HOST=master.example.com
+```
+
+When set, both `MASTER_SERVER_NAME` and `MOTD_SERVER_NAME` (and therefore the
+`sv_master1` / `cl_master` defaults) resolve to that host. When **not** set
+(the default), they are the empty string and the engine relies entirely on the
+`sv_master2` community fallback and/or runtime cvars — local and dev builds
+ship with no baked-in master on purpose.
+
+**Summary:** an empty/unreachable master is always harmless — it is skipped on
+the server and yields an empty Internet list on the client; nothing hangs.
