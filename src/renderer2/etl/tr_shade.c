@@ -144,8 +144,8 @@ static void BindLightMap()
 }
 
 /**
- * @brief BindDeluxeMap
- * unused
+ * @brief BindDeluxeMap   RM/R2-6: re-enabled (binds the per-surface deluxemap to TEX_DELUXE)
+ */
 static void BindDeluxeMap(shaderStage_t *pStage)
 {
     image_t *deluxemap;
@@ -175,7 +175,6 @@ static void BindDeluxeMap(shaderStage_t *pStage)
 
     GL_Bind(deluxemap);
 }
-*/
 
 /**
 * @brief BindCubeMaps
@@ -891,7 +890,9 @@ static void Render_lightMapping(int stage, qboolean asColorMap, qboolean normalM
 	shaderStage_t *pStage             = tess.surfaceStages[stage];
 	uint32_t      stateBits           = pStage->stateBits;
 	qboolean      use_parallaxMapping = (normalMapping && r_parallaxMapping->integer && tess.surfaceShader->parallax);
-	//qboolean use_deluxeMapping = (normalMapping && qfalse); // r_showDeluxeMaps->integer == 1 AND a deluxemap exists!    because there is no code that does anything with deluxemaps, we disable it..
+	// RM/R2-6: deluxe per-pixel lighting — rides the normal-mapping path (needs the
+	// per-pixel normal). Active only on a deluxe-compiled map with deluxemaps loaded.
+	qboolean use_deluxeMapping = (normalMapping && tr.worldDeluxeMapping && tr.deluxemaps.currentElements > 0);
 	qboolean use_specular    = normalMapping;
 	qboolean use_reflections = (normalMapping && r_reflectionMapping->integer && tr.cubeProbes.currentElements > 0 && !tr.refdef.pixelTarget);
 	// TODO: and when surface has something environment mappy assigned..
@@ -913,7 +914,7 @@ static void Render_lightMapping(int stage, qboolean asColorMap, qboolean normalM
 	                          USE_DEFORM_VERTEXES, tess.surfaceShader->numDeforms,   // && !ShaderRequiresCPUDeforms(tess.surfaceShader),
 	                          USE_NORMAL_MAPPING, normalMapping,
 	                          USE_PARALLAX_MAPPING, use_parallaxMapping,
-//								USE_DELUXE_MAPPING, use_deluxeMapping,
+	                          USE_DELUXE_MAPPING, use_deluxeMapping,
 	                          USE_REFLECTIONS, use_reflections,
 	                          USE_SPECULAR, use_specular);
 
@@ -950,7 +951,10 @@ static void Render_lightMapping(int stage, qboolean asColorMap, qboolean normalM
 
 	// ..
 	SetUniformBoolean(UNIFORM_B_SHOW_LIGHTMAP, (r_showLightMaps->integer == 1 ? GL_TRUE : GL_FALSE));
-	//SetUniformBoolean(UNIFORM_B_SHOW_DELUXEMAP, (r_showDeluxeMaps->integer == 1 ? GL_TRUE : GL_FALSE));
+	if (use_deluxeMapping)
+	{
+		SetUniformBoolean(UNIFORM_B_SHOW_DELUXEMAP, (r_showDeluxeMaps->integer == 1 ? GL_TRUE : GL_FALSE));
+	}
 
 	//SetUniformVec3(UNIFORM_LIGHTDIR, backEnd.currentEntity->lightDir);
 	SetUniformVec3(UNIFORM_LIGHTDIR, tr.sunDirection);
@@ -991,10 +995,11 @@ static void Render_lightMapping(int stage, qboolean asColorMap, qboolean normalM
 				BindCubeMaps();
 			}
 		}
-		//if (use_deluxeMapping) {
-		//SelectTexture(TEX_DELUXE);
-		//BindDeluxeMap(pStage);
-		//}
+		if (use_deluxeMapping)
+		{
+			SelectTexture(TEX_DELUXE);
+			BindDeluxeMap(pStage);
+		}
 	}
 
 
