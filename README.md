@@ -84,10 +84,19 @@ before merging; milestones are tagged.
   always exempt, so normal play is unaffected. Public / internet-facing servers
   should set `sv_protect 3`. See `docs/HOSTING.md`.
 
-Planned next, in order: a revived server browser; later, modern (TLS) content
-downloads for custom-map distribution. Linux
-and macOS support is deferred but kept in mind — new code prefers SDL and
-standard APIs. Details in `docs/MODERNIZATION.md`.
+**Server browser** (`rm-server-browser`)
+- The browser is revived: LAN discovery (IPv4 broadcast) and an internet master.
+  The dead id master is gone; servers and clients point at a configurable master
+  (`sv_master1` / `cl_master`, or a build-time default), with the ET:Legacy
+  community master as a fallback so the existing scene stays visible. A project
+  master server runs on a VPS. Wire protocol is unchanged (84), so RM can still
+  browse — and join where the native-module/pure rules allow — original ET
+  servers. See `docs/HOSTING.md`.
+
+Planned next, in order: optional renderer mapper hooks, and modern (TLS) content
+downloads for custom-map distribution. Linux and macOS support is deferred but
+kept in mind — new code prefers SDL and standard APIs. Details in
+`docs/MODERNIZATION.md`.
 
 ## Game data is not included
 

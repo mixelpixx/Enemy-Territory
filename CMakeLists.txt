@@ -55,6 +55,23 @@ option(BUILD_FEEL_HARNESS    "Build the pmove determinism test (Phase 3)" ON)
 
 include(CompilerWarnings)
 
+# ----------------------------------------------------------------------------
+#  NET-3: master server host. The dead etmaster.idsoftware.com default was
+#  removed from qcommon.h; RM_MASTER_HOST is baked in as the MASTER_SERVER_NAME /
+#  MOTD_SERVER_NAME (hence sv_master1 / cl_master) default. Defaults to the
+#  project master deployed on the VPS (dpmaster, 31.97.133.47:27950). Override
+#  with -DRM_MASTER_HOST=<host> (e.g. a DNS name), or -DRM_MASTER_HOST="" for a
+#  master-less build that is configured purely at runtime. The sv_master2
+#  community fallback (master.etlegacy.com) is unaffected.
+# ----------------------------------------------------------------------------
+set(RM_MASTER_HOST "31.97.133.47" CACHE STRING "RM master server hostname baked into the engine (empty = runtime-configured)")
+if(RM_MASTER_HOST)
+    add_compile_definitions(RM_MASTER_HOST="${RM_MASTER_HOST}")
+    message(STATUS "ET-RM: master host baked in -> ${RM_MASTER_HOST}")
+else()
+    message(STATUS "ET-RM: no master host baked in (set -DRM_MASTER_HOST=... or sv_master1/cl_master at runtime)")
+endif()
+
 set(ETRM_SRC "${CMAKE_SOURCE_DIR}/src")
 
 # ----------------------------------------------------------------------------
