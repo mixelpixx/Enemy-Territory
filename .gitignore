@@ -4,6 +4,9 @@
 /build/
 /build-*/
 /out/
+
+# Installer build output (setup.exe + test installs; installer/*.iss source is tracked)
+/dist/
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake

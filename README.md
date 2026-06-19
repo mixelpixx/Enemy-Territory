@@ -106,13 +106,19 @@ modern (TLS) content downloads for custom-map distribution. Linux and macOS supp
 is deferred but kept in mind — new code prefers SDL and standard APIs. Details in
 `docs/MODERNIZATION.md`.
 
-## Game data is not included
+## Game data and the installer
 
-This repository contains source code only. It does not contain, and will never
-contain, game assets. To run, supply your own retail *Wolfenstein: Enemy
-Territory* 2.60b data (`pak0.pk3`, `pak1.pk3`, `pak2.pk3`, `mp_bin.pk3`). The
-full game was released as a free download by Splash Damage and id Software and
-is still widely available. See [`docs/BUILD.md`](docs/BUILD.md).
+The repository contains source plus the project's **own original content** (such as
+the `rm_showcase` map and its textures). It does **not** contain the retail
+*Wolfenstein: Enemy Territory* data. To build and run from source, supply your own
+retail 2.60b paks (`pak0.pk3`, `pak1.pk3`, `pak2.pk3`, `mp_bin.pk3`) — the full game
+was released as a free download by Splash Damage and id Software and is still widely
+available. See [`docs/BUILD.md`](docs/BUILD.md).
+
+For players, a self-contained Windows **installer** bundles the engine, the RM
+content, and the retail data into one download-and-play `setup.exe` — no separate
+runtime download, no map data to fetch, no admin (per-user install). Building it is
+documented in [`docs/INSTALLER.md`](docs/INSTALLER.md).
 
 ## Repository layout
 
@@ -120,6 +126,8 @@ is still widely available. See [`docs/BUILD.md`](docs/BUILD.md).
 |------|----------|
 | `src/` | Engine, renderers, and game/cgame/ui module source |
 | `src/renderer2/` | The opt-in modern renderer (vendored ET:Legacy renderer2 plus the bridge that connects it to this engine) |
+| `rm_showcase/` | Project-original showcase map + materials demonstrating the modern-renderer mapper hooks (built into `rm_showcase.pk3`) |
+| `installer/` | Inno Setup script for the download-and-play Windows installer |
 | `cmake/` | CMake build modules (per target) |
 | `tests/` | Movement-determinism (feel) test harness |
 | `docs/` | Build instructions, modernization catalog, third-party notes |
