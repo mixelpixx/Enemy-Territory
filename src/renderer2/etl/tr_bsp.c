@@ -771,7 +771,8 @@ static void R_LoadLightmapsInternal(lump_t *l, const char *bspName)
 		// expand the 24 bit on-disk to 32 bit
 		buf_p = buf + i * LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3;
 
-		/*if (tr.worldDeluxeMapping)
+		// RM/R2-6: re-enabled deluxe interleave (even=lightmap, odd=deluxemap)
+		if (tr.worldDeluxeMapping)
 		{
 			if (i % 2 == 0)
 			{
@@ -797,15 +798,15 @@ static void R_LoadLightmapsInternal(lump_t *l, const char *bspName)
 			}
 		}
 		else
-		{*/
-		for (j = 0; j < LIGHTMAP_SIZE * LIGHTMAP_SIZE; j++)
 		{
-			R_ColorShiftLightingBytes(&buf_p[j * 3], &data[j * 4]);
-			data[j * 4 + 3] = 255;
+			for (j = 0; j < LIGHTMAP_SIZE * LIGHTMAP_SIZE; j++)
+			{
+				R_ColorShiftLightingBytes(&buf_p[j * 3], &data[j * 4]);
+				data[j * 4 + 3] = 255;
+			}
+			image = R_CreateImage(va("_lightmap%d", i), data, LIGHTMAP_SIZE, LIGHTMAP_SIZE, IF_LIGHTMAP | IF_NOCOMPRESSION, FT_DEFAULT, WT_EDGE_CLAMP);
+			Com_AddToGrowList(&tr.lightmaps, image);
 		}
-		image = R_CreateImage(va("_lightmap%d", i), data, LIGHTMAP_SIZE, LIGHTMAP_SIZE, IF_LIGHTMAP | IF_NOCOMPRESSION, FT_DEFAULT, WT_EDGE_CLAMP);
-		Com_AddToGrowList(&tr.lightmaps, image);
-		//}
 	}
 }
 
@@ -984,26 +985,28 @@ static void R_LoadLightmapsExternal(lump_t *l, const char *bspName)
 	{
 		Ren_Developer("...loading external lightmap '%s/%s'\n", mapName, lightmapFiles[i]);
 
-		/*if (tr.worldDeluxeMapping)
+		// RM/R2-6: re-enabled external deluxe interleave (even=lightmap, odd=deluxemap)
+		if (tr.worldDeluxeMapping)
+		{
+			if (i % 2 == 0)
 			{
-				if (i % 2 == 0)
-				{
-					Ren_Developer("Loading lightmap\n");
-					image = R_FindImageFile(va("%s/%s", mapName, lightmapFiles[i]), IF_LIGHTMAP | IF_NOCOMPRESSION | IF_NOPICMIP, FT_LINEAR, WT_EDGE_CLAMP, NULL);
-					Com_AddToGrowList(&tr.lightmaps, image);
-				}
-				else
-				{
-					Ren_Developer("Loading deluxemap\n");
-					image = R_FindImageFile(va("%s/%s", mapName, lightmapFiles[i]), IF_NORMALMAP | IF_NOCOMPRESSION | IF_NOPICMIP, FT_LINEAR, WT_EDGE_CLAMP, NULL);
-					Com_AddToGrowList(&tr.deluxemaps, image);
-				}
+				Ren_Developer("Loading lightmap\n");
+				image = R_FindImageFile(va("%s/%s", mapName, lightmapFiles[i]), IF_LIGHTMAP | IF_NOCOMPRESSION | IF_NOPICMIP, FT_LINEAR, WT_EDGE_CLAMP, NULL);
+				Com_AddToGrowList(&tr.lightmaps, image);
 			}
 			else
-			{*/
-		Ren_Developer("Loading lightmap\n");
-		image = R_FindImageFile(va("%s/%s", mapName, lightmapFiles[i]), IF_LIGHTMAP | IF_NOCOMPRESSION | IF_NOPICMIP, FT_LINEAR, WT_EDGE_CLAMP, NULL);
-		Com_AddToGrowList(&tr.lightmaps, image);
+			{
+				Ren_Developer("Loading deluxemap\n");
+				image = R_FindImageFile(va("%s/%s", mapName, lightmapFiles[i]), IF_NORMALMAP | IF_NOCOMPRESSION | IF_NOPICMIP, FT_LINEAR, WT_EDGE_CLAMP, NULL);
+				Com_AddToGrowList(&tr.deluxemaps, image);
+			}
+		}
+		else
+		{
+			Ren_Developer("Loading lightmap\n");
+			image = R_FindImageFile(va("%s/%s", mapName, lightmapFiles[i]), IF_LIGHTMAP | IF_NOCOMPRESSION | IF_NOPICMIP, FT_LINEAR, WT_EDGE_CLAMP, NULL);
+			Com_AddToGrowList(&tr.lightmaps, image);
+		}
 	}
 
 
@@ -1174,10 +1177,11 @@ static void ParseFace(dsurface_t *ds, drawVert_t *verts, bspSurface_t *surf, int
 		surf->lightmapNum = LittleLong(ds->lightmapNum);
 	}
 
-	/*if (tr.worldDeluxeMapping && surf->lightmapNum >= 2)
+	// RM/R2-6: deluxe interleaves L,D so the lump has 2x lightmaps; map index back
+	if (tr.worldDeluxeMapping && surf->lightmapNum >= 2)
 	{
 		surf->lightmapNum /= 2;
-	}*/
+	}
 
 	/*
 	if(surf->lightmapNum >= tr.lightmaps.currentElements)
@@ -1353,10 +1357,11 @@ static void ParseMesh(dsurface_t *ds, drawVert_t *verts, bspSurface_t *surf)
 		surf->lightmapNum = LittleLong(ds->lightmapNum);
 	}
 
-	/*if (tr.worldDeluxeMapping && surf->lightmapNum >= 2)
+	// RM/R2-6: deluxe interleaves L,D so the lump has 2x lightmaps; map index back
+	if (tr.worldDeluxeMapping && surf->lightmapNum >= 2)
 	{
 		surf->lightmapNum /= 2;
-	}*/
+	}
 
 	// get fog volume
 	surf->fogIndex = LittleLong(ds->fogNum) + 1;
@@ -1453,10 +1458,11 @@ static void ParseTriSurf(dsurface_t *ds, drawVert_t *verts, bspSurface_t *surf, 
 		surf->lightmapNum = LittleLong(ds->lightmapNum);
 	}
 
-	/*if (tr.worldDeluxeMapping && surf->lightmapNum >= 2)
+	// RM/R2-6: deluxe interleaves L,D so the lump has 2x lightmaps; map index back
+	if (tr.worldDeluxeMapping && surf->lightmapNum >= 2)
 	{
 		surf->lightmapNum /= 2;
-	}*/
+	}
 
 	// get fog volume
 	surf->fogIndex = LittleLong(ds->fogNum) + 1;
@@ -5588,12 +5594,13 @@ void R_LoadEntities(lump_t *l)
 			tr.fogDensity = atof(value);
 		}
 		// check for deluxe mapping support
-		/*if (!Q_stricmp(keyname, "deluxeMapping") && !Q_stricmp(value, "1"))
+		// RM/R2-6: re-enabled (was commented upstream) — opt-in per-pixel
+		// directional lightmaps. Inert on stock content (no key -> flag false).
+		else if (!Q_stricmp(keyname, "deluxeMapping") && !Q_stricmp(value, "1"))
 		{
 			Ren_Developer("map features directional light mapping\n");
 			tr.worldDeluxeMapping = qtrue;
-			continue;
-		}*/
+		}
 		// check for mapOverBrightBits override
 		else if (!Q_stricmp(keyname, "mapOverBrightBits"))
 		{
@@ -5601,7 +5608,9 @@ void R_LoadEntities(lump_t *l)
 		}
 
 		// check for deluxe mapping provided by NetRadiant's q3map2
-		/*if (!Q_stricmp(keyname, "_q3map2_cmdline"))
+		// RM/R2-6: re-enabled — auto-detect a -deluxe compile from the q3map2
+		// command line stamped into the worldspawn.
+		else if (!Q_stricmp(keyname, "_q3map2_cmdline"))
 		{
 			s = strstr(value, "-deluxe");
 			if (s)
@@ -5609,8 +5618,7 @@ void R_LoadEntities(lump_t *l)
 				Ren_Developer("map features directional light mapping\n");
 				tr.worldDeluxeMapping = qtrue;
 			}
-			continue;
-		}*/
+		}
 
 
 		// check for HDR light mapping support
@@ -8741,7 +8749,7 @@ void RE_LoadWorldMap(const char *name)
 	tr.world = NULL;
 
 	// tr.worldDeluxeMapping will be set by R_LoadEntities()
-	//tr.worldDeluxeMapping = qfalse;
+	tr.worldDeluxeMapping = qfalse;   // RM/R2-6: reset per map
 	tr.worldHDR_RGBE = qfalse;
 
 	Com_Memset(&s_worldData, 0, sizeof(s_worldData));

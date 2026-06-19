@@ -93,9 +93,17 @@ before merging; milestones are tagged.
   browse — and join where the native-module/pure rules allow — original ET
   servers. See `docs/HOSTING.md`.
 
-Planned next, in order: optional renderer mapper hooks, and modern (TLS) content
-downloads for custom-map distribution. Linux and macOS support is deferred but
-kept in mind — new code prefers SDL and standard APIs. Details in
+**Renderer mapper hooks** (`rm-r2-6`)
+- Map authors can light authored content with the modern renderer's per-pixel
+  materials (normal/specular/parallax), a directional sun that casts real-time
+  shadows, and deluxe (per-pixel directional) lightmaps — features the 2003 data
+  never exercised. A project-original showcase map (`devmap rm_showcase` under
+  `cl_renderer gl2`) demonstrates all three; the authoring contract is in
+  `docs/MAPPER-HOOKS.md`. Stock maps and the original renderer are untouched.
+
+Planned next: a bundled, no-patching Windows installer (download-and-play), and
+modern (TLS) content downloads for custom-map distribution. Linux and macOS support
+is deferred but kept in mind — new code prefers SDL and standard APIs. Details in
 `docs/MODERNIZATION.md`.
 
 ## Game data is not included

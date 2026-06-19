@@ -7,7 +7,6 @@
 #endif // USE_NORMAL_MAPPING
 
 uniform bool SHOW_LIGHTMAP;
-//uniform bool SHOW_DELUXEMAP;
 
 uniform int       u_AlphaTest;
 uniform vec3      u_LightColor;
@@ -18,9 +17,10 @@ uniform sampler2D u_NormalMap;
 #if defined(USE_PARALLAX_MAPPING)
 uniform float u_DepthScale;
 #endif // USE_PARALLAX_MAPPING
-//#if defined(USE_DELUXE_MAPPING)
-//uniform sampler2D u_DeluxeMap;
-//#endif // USE_DELUXE_MAPPING
+#if defined(USE_DELUXE_MAPPING)   // RM/R2-6
+uniform sampler2D u_DeluxeMap;
+uniform bool      SHOW_DELUXEMAP;
+#endif // USE_DELUXE_MAPPING
 #if defined(USE_REFLECTIONS) || defined(USE_SPECULAR)
 uniform sampler2D u_SpecularMap;
 #if defined(USE_REFLECTIONS)
@@ -133,7 +133,14 @@ void main()
 	vec3 V = var_ViewOrigin;
 
 	// light direction in world space
+#if defined(USE_DELUXE_MAPPING)   // RM/R2-6
+	// per-pixel baked light direction from the deluxemap (q3map2 stores it in
+	// tangent space; transform to world to match N). The lightmap supplies the
+	// intensity/colour, the deluxemap the direction.
+	vec3 L = normalize(var_tangentMatrix * (texture2D(u_DeluxeMap, var_TexLight).xyz * 2.0 - 1.0));
+#else
 	vec3 L = var_LightDirection;
+#endif
 
 	// normal
 	vec3 Ntex = texture2D(u_NormalMap, texNormal).xyz * 2.0 - 1.0;
@@ -211,14 +218,14 @@ void main()
 		return;
 	}
 
-//#if defined(USE_DELUXE_MAPPING)
-//	// show only the deluxemap?
-//	if (SHOW_DELUXEMAP)
-//  {
-//		gl_FragColor = texture2D(u_DeluxeMap, var_TexLight);
-//		return;
-//	}
-//#endif // USE_DELUXE_MAPPING
+#if defined(USE_DELUXE_MAPPING)   // RM/R2-6
+	// debug aid: show only the deluxemap (r_showDeluxeMaps)
+	if (SHOW_DELUXEMAP)
+	{
+		gl_FragColor = texture2D(u_DeluxeMap, var_TexLight);
+		return;
+	}
+#endif // USE_DELUXE_MAPPING
 
 	gl_FragColor = color;
 }
