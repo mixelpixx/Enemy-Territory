@@ -73,16 +73,29 @@ final bake (the demo used `-fast`).
   variation we can't faithfully recreate without the source).
 - **Missing models** — see below.
 
-## Models: why 24 are missing
+## Models: the set-dressing gap
 
-Oasis references 56 `misc_model` `.md3`s. ~32 ship in `pak0` (tanks, guns, radios, the
-pump objective — gameplay models). The other **24 are pure set dressing** (standing
-palms `palm_trunk1-3` / `palm_leaves1-3`, vases, baskets, bushes, furniture,
-`dragon_teeth`, siwa props, toolshed, `wagon_tilt`). These were **baked into the
-shipped `oasis.bsp`** at the original compile, so their **source `.md3`s were never
-distributed in the paks** (only their textures, e.g. `palm_trunk.tga`, were). q3map2
-needs the `.md3`s to re-insert them; without them it omits them (non-fatal). Sourcing
-them from an ET mapobjects resource pack / community map is the outstanding step.
+Oasis references **56 `misc_model` `.md3`s + 6 `.ase`** prefab/tunnel meshes. ~32 of
+the `.md3`s ship in `pak0` (tanks, guns, radios, the pump objective — gameplay models).
+The rest are **set dressing that was baked into the shipped `oasis.bsp`** at the
+original compile, so their **source models were never distributed in the paks** (only
+their textures were). q3map2 needs the source models to re-insert them; missing ones
+are omitted (non-fatal).
+
+Sourced so far (**24 of 34 models in**):
+- **GtkRadiant 1.6.20120520 ETPack** (the ET map editor bundles the SD mapobjects at
+  the exact paths, incl. SD's `miltary_trim` typo) → 22 models: all 6 palms, vases,
+  plants/bushes, furniture, baskets, `fuel_can`, `dragon_teeth`, `wagon_tilt`,
+  `siwa_cushiona1`. `https://www.wolffiles.eu/files/gtkradiant-16-20120520/download`
+- **hkf1 map** → `toolshed/generator.md3`, `toolshed/tools1.md3`.
+  `https://www.wolffiles.eu/files/hkf1/download`
+
+Still missing (**10**, only in the gated ~4.5 GB Teuthis "Mapping sources" SD pack;
+all non-fatal — they're detail on top of brushwork that's already present):
+- `.ase`: `prefabs_sd/prefabs_egyptian_{obelisk,pillar,pillar_half,pillar_with_bottom}`
+  and `siwa_tunnels_sd/{blocks,tunnel_new2}` (obelisk/pillar/tunnel detail meshes).
+- `.md3`: `siwa_props_sd/{siwa_book2,siwa_vessel1,siwa_vessel2,siwa_vessel3}` (small
+  interior pottery).
 
 ## Current state
 
@@ -91,8 +104,9 @@ them from an ET mapobjects resource pack / community map is the outstanding step
   (4 + 4 deluxe), no crash.
 - ✅ Sun shadows + deluxe + HD materials visible; A/B vs stock oasis = ~77% of frame
   changed at the old-city viewpoints, brightness preserved.
-- ⏳ 24 set-dressing models omitted (being sourced).
-- ⏳ `-fast` bake (to be replaced with a full-quality bake).
+- ✅ **24 of 34 set-dressing models** re-inserted (palms, vases, plants, furniture,
+  baskets, toolshed, …) from GtkRadiant + hkf1; 10 detail meshes omitted (see above).
+- ✅ Full-quality light bake (`-bounce 4 -samples 2 -deluxe`, no `-fast`).
 - Demo staged loose in `build/bin/etmain/` (`devmap oasis_rm`, `cl_renderer gl2`).
 
 ## Caveats
