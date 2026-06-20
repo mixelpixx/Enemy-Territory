@@ -106,8 +106,12 @@ all non-fatal — they're detail on top of brushwork that's already present):
   changed at the old-city viewpoints, brightness preserved.
 - ✅ **24 of 34 set-dressing models** re-inserted (palms, vases, plants, furniture,
   baskets, toolshed, …) from GtkRadiant + hkf1; 10 detail meshes omitted (see above).
-- ✅ Full-quality light bake (`-bounce 4 -samples 2 -deluxe`, no `-fast`).
-- Demo staged loose in `build/bin/etmain/` (`devmap oasis_rm`, `cl_renderer gl2`).
+- ✅ Light bake with radiosity + deluxe (`-fast -bounce 2 -samples 2 -deluxe
+  -deluxemode 1 -external`, ~3 min). Palms/props render with sun shadows + deluxe +
+  HD materials (verified at the allied courtyard + old-city viewpoints).
+- ✅ Packaged as `build/oasis_rm/oasis_rm.pk3` (~16 MB: recompiled BSP with the 24
+  baked models + lightmaps/deluxe + HD materials). `devmap oasis_rm`, `cl_renderer gl2`.
+  Not committed (SD-derived) — a build artifact, like the bundled retail data.
 
 ## Caveats
 
